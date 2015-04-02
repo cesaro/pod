@@ -167,12 +167,14 @@ class Integer :
         for i in xrange (k) :
             self.bit.append (cnf.var (("int-bit%d" % i, obj)))
 
-    def encode_eq (self, other) :
+    def encode_eq (self, other, vout=None) :
         # this encodes self == other
         # the returned variable v holds iff (self == other)
         if other.k != self.k :
             raise Exception, "Different bit width while encoding integer equality"
-        v = self.cnf.var (("int-eq", self.obj, other.obj))
+        v = vout
+        if v == None :
+            v = self.cnf.var (("int-eq", self.obj, other.obj))
         vi_clause = [v]
         for i in xrange (self.k) :
             vi = self.cnf.var (("int-eq-aux%d" % i, self.obj, other.obj))

@@ -4,6 +4,7 @@ try :
     import os
     import sys
     import time
+    import math
     import resource
     import argparse
     import ptnet
@@ -113,14 +114,13 @@ class Equivalence_finder :
         self.satf = cnf.Cnf ()
 
         # EQ : it is an equivalence relation
-        #self.__sat_encode_transitivity ()
+        self.__sat_encode_transitivity ()
 
         # IP : it preserves independence
-        #self.__sat_encode_labels ()
-        #self.__sat_encode_pre ()
-        #self.__sat_encode_post ()
+        self.__sat_encode_labels ()
+        self.__sat_encode_pre ()
+        self.__sat_encode_post ()
         self.__sat_encode_co ()
-        return
 
         # RA : does not merge removed events
         self.__sat_encode_removal ()
@@ -228,10 +228,32 @@ class Equivalence_finder :
             print "podisc: sat: encode_co:", repr (c1), repr (c2)
             self.satf.add ([-v])
 
-    def __sat_encode_removal (self) :
-        pass
-
     def __sat_encode_measure (self, k) :
+        # we associate an integer to every event
+        bitwith = int (math.ceil (math.log (1 + len (self.unf.events), 2)))
+        intmap = {}
+        for e in self.unf.events :
+            intmap[e] = cnf.Integer (self.cnf, e, bitwith)
+        
+        # for every two events, if they are merged, the integers must equal
+        for i in range (len (self.unf.events)) :
+            for j in range (i + 1, len (self.unf.events)) :
+                ei = self.unf.events[i]
+                ej = self.unf.events[j]
+                vij = self.satf.var (self.__ord_pair (ei, ej))
+
+                intmap[ei].encode_eq (intmap[ej], vij)
+
+        # we generate one more integer for the bound
+        bound = cnf.Integer (self, cnf, "bound (k+1)", bitwith)
+        bound.encode_eq_constant (k + 1)
+
+        # the integer associated to any event must be smaller than the bound
+        for encint in intmap.values () :
+            v = encint.encode_lt (bound)
+            self.cnf.add ([v])
+
+    def __sat_encode_removal (self) :
         pass
 
     def smt_encode (self) :
@@ -323,9 +345,18 @@ def test6 () :
     f = open ("/tmp/out.cnf", "w")
     phi.write (f)
 
+def test7 () :
+    # events, conditions, k, vars, clauses, k, minisat time, answer
+
 def main () :
     # parse arguments
     # assert that input net is 1-safe!!
+
+    # TODO
+    # - support for reading the model and building a Merge_equivalence
+    # - support for merging the unfolding given a Merge_equivalence
+    # - debug on some small example, start with gas_station.cuf, depth=2,3,4
+
     pass
 
 if __name__ == '__main__' :
