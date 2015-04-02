@@ -19,6 +19,18 @@ class Transition :
         return str (self.name)
 
     def __str__ (self) :
+        for p in self.pre :
+            assert (self.weight_pre[p] >= 1)
+        for p in self.post :
+            assert (self.weight_post[p] >= 1)
+        for p in self.cont :
+            assert (self.weight_cont[p] >= 1)
+        for p in self.weight_pre :
+            assert (p in self.pre)
+        for p in self.weight_post :
+            assert (p in self.post)
+        for p in self.weight_cont :
+            assert (p in self.cont)
         return "'%s' Pre %s;  Cont %s;  Post %s" \
                 % (self.__repr__ (), self.weight_pre, self.weight_cont, self.weight_post)
 
@@ -79,6 +91,18 @@ class Place :
         return str (self.name)
 
     def __str__ (self) :
+        for t in self.pre :
+            assert (self.weight_pre[t] >= 1)
+        for t in self.post :
+            assert (self.weight_post[t] >= 1)
+        for t in self.cont :
+            assert (self.weight_cont[t] >= 1)
+        for t in self.weight_pre :
+            assert (t in self.pre)
+        for t in self.weight_post :
+            assert (t in self.post)
+        for t in self.weight_cont :
+            assert (t in self.cont)
         return "'%s' Pre %s;  Cont %s;  Post %s" \
                 % (self.__repr__ (), self.weight_pre, self.weight_cont, self.weight_post)
                 #% (self.__repr__ (), self.pre, self.cont, self.post)
@@ -582,7 +606,7 @@ class Net :
 #            if (e.m) : s += ' fillcolor=blue'
             f.write (s + '];\n')
 
-        f.write ('\n\t/* places, flow and context relations */\n')
+        f.write ('\n\t/* places, flow, and context relations */\n')
         f.write ('\tnode\t[shape=circle fillcolor=gray95];')
         for p in self.places :
             if m != 0 and p.m != m: continue

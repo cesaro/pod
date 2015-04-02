@@ -252,12 +252,6 @@ def test2 () :
 
 def test3 () :
     u = ptnet.unfolding.Unfolding (True)
-    f = open ('benchmarks/nets/small/dme2.cuf', 'r')
-    u.read (f)
-    u.prune_by_depth (10)
-
-def test4 () :
-    u = ptnet.unfolding.Unfolding (True)
     f = open ('benchmarks/nets/small/gas_station.cuf', 'r')
     u.read (f)
 
@@ -278,6 +272,23 @@ def test4 () :
     u.remove_event (u.events[0].nr)
     print "after removing event"
     u.write (sys.stdout, 'dot')
+
+def test4 () :
+    u = ptnet.unfolding.Unfolding (True)
+    f = open ('benchmarks/nets/small/gas_station.cuf', 'r')
+    #f = open ('out.cuf', 'r')
+    u.read (f)
+    u.prune_by_depth (4)
+    u.write (sys.stdout, 'dot')
+    #u.remove_event (6)
+    #u.write (sys.stdout, 'dot')
+
+    #print 'conditions'
+    #for c in u.conds :
+    #    print c
+    #print 'events'
+    #for e in u.events :
+    #    print e
 
 def main () :
     # parse arguments

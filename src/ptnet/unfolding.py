@@ -71,27 +71,36 @@ class Unfolding (net.Net) :
         c = self.conds[nr]
         self.m0[c] = 0
         if len (c.pre) :
-            sgl (c.pre).post.remove (c)
-        for e in c.cont : e.cont.remove (c)
-        for e in c.post : e.pre.remove (c)
+            (sgl(c.pre)).post.remove (c)
+            del (sgl(c.pre)).weight_post[c]
+        for e in c.cont :
+            e.cont.remove (c)
+            del e.weight_cont [c]
+        for e in c.post :
+            e.pre.remove (c)
+            del e.weight_pre [c]
         if nr != len (self.conds) - 1 :
             self.conds[nr] = self.conds[-1]
             self.conds[nr].nr = nr
         del self.conds[-1]
-        del c
 
     def remove_event (self, nr) :
         e = self.events[nr]
-        for c in e.pre : c.post.remove (e)
-        for c in e.cont : c.cont.remove (e)
-        for c in e.post : c.pre = set ()
+        for c in e.pre :
+            c.post.remove (e)
+            del c.weight_post[e]
+        for c in e.cont :
+            c.cont.remove (e)
+            del c.weight_cont[e]
+        for c in e.post :
+            c.pre = set ()
+            del c.weight_pre[e]
         if e.isblack : self.nr_black -= 1
         if e.isgray : self.nr_gray -= 1
         if nr != len (self.events) - 1 :
             self.events[nr] = self.events[-1]
             self.events[nr].nr = nr
         del self.events[-1]
-        del e
 
     def read (self, f, fmt='cuf3') :
         if fmt == 'cuf' : fmt = 'cuf3'
@@ -234,7 +243,7 @@ class Unfolding (net.Net) :
 
     def prune_by_depth (self, k) :
         m = self.m0.clone  ()
-        for i in range (k) :
+        for i in range (k - 1) :
             newm = m.clone ()
             for e in self.enabled (m) :
                 for c in e.post :
@@ -245,7 +254,7 @@ class Unfolding (net.Net) :
         new_conds = set ()
         mrk = self.new_mark ()
         for e in new_events :
-            for c in e.pre | e.post | e.cond :
+            for c in e.pre | e.post | e.cont :
                 c.m = mrk
                 new_conds.add (c)
 
@@ -255,7 +264,7 @@ class Unfolding (net.Net) :
         for e in rem_events :
             self.remove_event (e.nr)
         for c in rem_conds :
-            self.remove_cond (e.nr)
+            self.remove_cond (c.nr)
 
     def is_configuration (self, s) :
         pre = set ()
@@ -577,7 +586,6 @@ def test1 () :
     u.write (f2, 'dot')
     u.remove_event (16)
     u.write (f3, 'dot')
-    del u
 
     for x in [f, f1, f2] : x.close ()
 
