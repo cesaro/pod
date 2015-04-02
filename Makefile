@@ -1,30 +1,15 @@
 
-# Copyright (C) 2010, 2011  Cesar Rodriguez <cesar.rodriguez@lsv.ens-cachan.fr>
-#
-# This program is free software: you can redistribute it and/or modify it
-# under the terms of the GNU General Public License as published by the Free
-# Software Foundation, either version 3 of the License, or any later version.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-# more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# this program.  If not, see <http://www.gnu.org/licenses/>.
-
 include defs.mk
 
 .PHONY: fake all g test clean distclean prof dist
 
-all: $(TARGETS) tags
+all: tags
 	#./src/cunf/cunf examples/tiny/numh.ll_net  --save out.cuf input
 	#./src/cunf/cunf -vvv examples/tiny/pag9.ll_net  --save out.cuf input
 	#./src/pep2pt examples/plain/small/dme2.ll_net
 
-$(TARGETS) : % : %.o $(OBJS)
-	@echo "LD  $@"
-	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) 
+bench_build_unfoldings :
+	for i in benchmarks/nets/*.ll_net; do echo $i; j=`echo $i | sed 's/.ll_net//'`; echo $j; cunf -v $i -s $j.cuf; done
 
 #$(MINISAT)/build/release/lib/libminisat.a :
 #	cd $(MINISAT); make lr

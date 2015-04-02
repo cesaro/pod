@@ -71,7 +71,7 @@ class Unfolding (net.Net) :
         if self.sanity_check : self.__sane_cond_id (nr)
         c = self.conds[nr]
         if sgl (c.pre) == None :
-            self.m0.discard (c)
+            self.m0[c] = 0
         else :
             sgl (c.pre).post.remove (c)
         for e in c.cont : e.cont.remove (c)
@@ -197,7 +197,7 @@ class Unfolding (net.Net) :
                 cont.add (self.events[idx])
             c = Condition (len (self.conds), p, pre, post, cont)
             self.conds.append (c)
-            if c.m0 > 0 : self.m0.add (c)
+            if c.m0 > 0 : self.m0[c] = c.m0
 
         # finally, read transition and place names
         s = f.read ()
@@ -239,6 +239,31 @@ class Unfolding (net.Net) :
 #            db ('enabled', ena, 'remains', len (conf))
 #            m = fire (ena, m)
 #        return run
+
+    def prune_by_depth (self, k) :
+        m = self.m0.clone  ()
+        for i in range (k) :
+            newm = m.clone ()
+            for e in self.enabled (m) :
+                for c in e.post :
+                    newm[c] = 1
+            m = newm
+
+        new_events = set ([e for self.enabled (m)])
+        new_conds = set ()
+        mrk = self.new_mark ()
+        for e in new_events :
+            for c in e.pre | e.post | e.cond :
+                c.m = mrk
+                new_conds.add (c)
+
+        rem_events = [e for e in self.events if e not in new_events]
+        rem_conds = [c for c in self.conds if c not in new_conds]
+
+        for e in rem_events :
+            self.rem_event (e.nr)
+        for c in rem_conds :
+            self.rem_cond (e.nr)
 
     def is_configuration (self, s) :
         pre = set ()
