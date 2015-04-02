@@ -29,125 +29,131 @@ def sgl (s) :
     return (list (s))[0]
 
 class Equivalence_finder :
-    def __init__ (self) :
-        self.unf = None
+    def __init__ (self, unfolding) :
+        self.unf = unfolding
         self.satf = None
         self.smtf = None
         self.__co = None
 
-        # many algorithms rely on this property
-        for i in range (self.unf.events) :
+        self.__compute_co_relation ()
+
+        # many algorithms in here rely on this property
+        for i in range (len (self.unf.events)) :
             assert (self.unf.events[i].nr == i)
-        for i in range (self.unf.conds) :
+        for i in range (len (self.unf.conds)) :
             assert (self.unf.conds[i].nr == i)
 
-    def __ord_pair (x, y) :
+    def __ord_pair (self, x, y) :
         if x.nr < y.nr :
             return (x, y)
         else :
             return (y, x)
 
-    def are_co (c1, c2) :
+    def are_co (self, c1, c2) :
         if self.co == None :
             self.__compute_co_relation ()
         return self.__ord_pair (c1, c2) in self.__co
 
-    def __compute_co_relation () :
+    def __compute_co_relation (self, ) :
         self.__co = set ()
         for c in self.unf.conds :
             self.__compute_co_relation_c (c)
-        
-    def __compute_co_relation_c (cgoal) :
-        mpre = self.unf.new_mark ()
-        mpost = self.unf.new_mark ()
-        mcfl = self.unf.new_mark ()
+
+    def __compute_co_relation_c (self, cgoal) :
+        print "podisc: compute_co: goal", repr (cgoal)
+        mpast = self.unf.new_mark ()
+        mfuture = self.unf.new_mark ()
 
         # mark conditions consumed and events fired to mark cgoal
         work = [cgoal]
         for c in work :
             if len (c.pre) == 0 : continue
             e = sgl (c.pre)
-            if e.m == mpre : continue
-            e.m = mpre
+            if e.m == mpast : continue
+            e.m = mpast
             for cc in e.pre :
-                cc.m = mpre
+                cc.m = mpast
                 work.append (cc)
         consumed = work
+        print "podisc: compute_co:  past"
+        print "podisc: compute_co: ", work
 
-        # mark conditions that need to consume cgoal to be marked
-        work = [cgoal]
+        # mark conditions that consume conditions in work (future of cgoal
+        # or conflict)
         for c in work :
             for e in c.post :
-                if e.m == mpost : continue
-                e.m = mpost
+                if e.m == mpast : continue # this one is in local config
+                e.m = mfuture
                 for cc in e.post :
-                    cc.m = mpost
+                    cc.m = mfuture
                     work.append (cc)
-
-        # mark conditions (and events) in conflict with cgoal
-        work = consumed
-        for c in work :
-            for e in c.post :
-                if e.m == mpre : continue # skip events in local config
-                if e.m == mcfl : continue
-                e.m = mcfl
-                for cc in c.post :
-                    cc.m = mcfl
-                    work.append (cc)
+        print "podisc: compute_co:  past and future"
+        print "podisc: compute_co: ", work
 
         # at this point
-        # - conds marked with mpre  : have been consumed to mark cgoal
-        # - conds marked with mpost : cgoal will be consumed to mark them
-        # - conds marked with mcfl  : are in conflict with cgoal
-        # - all others              : are concurrent
+        # - conds marked with mpast   : have been consumed to mark cgoal
+        # - conds marked with mfuture : cgoal in conflict or causal # predecessor
+        # - all others                : are concurrent
+        l = []
         for c in self.unf.conds :
-            if c.m == mpre or c.m == mcfl or c.m == mpost : continue
+            if c.m == mpast or c.m == mfuture : continue
             if c != cgoal :
+                l.append (c)
                 self.__co.add (self.__ord_pair (cgoal, c))
+        print "podisc: compute_co:  co"
+        print "podisc: compute_co: ", l
+        print "podisc: compute_co:  total", len (l)
 
     # def __are_co_assert (c1, c2) :
     #     # if they are siblings, then they are surely concurrent
     #     if len (c1.pre) and len (c2.pre) :
     #         if sgl (c1.pre) == sgl (c2.pre) : return True
 
-    def sat_encode (k) :
+    def sat_encode (self, k) :
         self.satf = cnf.Cnf ()
 
         # EQ : it is an equivalence relation
-        self.__sat_encode_transitivity ()
+        #self.__sat_encode_transitivity ()
 
         # IP : it preserves independence
-        self.__sat_encode_labels ()
-        self.__sat_encode_pre ()
-        self.__sat_encode_post ()
+        #self.__sat_encode_labels ()
+        #self.__sat_encode_pre ()
+        #self.__sat_encode_post ()
         self.__sat_encode_co ()
+        return
 
-        # RA : do no merge removed events
+        # RA : does not merge removed events
         self.__sat_encode_removal ()
 
         # MET : the measure of the folded net is at most k
         self.__sat_encode_measure (k)
 
-    def __sat_encode_transitivity () :
+    def __sat_encode_transitivity (self) :
         # events with events
         for ei in self.unf.events :
             for ej in self.unf.events :
+                if ei == ej : continue
                 for ek in self.unf.events :
+                    if ek == ei or ek == ej : continue
                     vij = self.satf.var (self.__ord_pair (ei, ej))
                     vjk = self.satf.var (self.__ord_pair (ej, ek))
                     vik = self.satf.var (self.__ord_pair (ei, ek))
                     self.satf.add ([-vij, -vjk, vik])
+                    print "podisc: sat: clause", repr (ei), repr (ej), repr (ek), [-vij, -vjk, vik]
 
         # conditions with conditions
         for ci in self.unf.conds :
             for cj in self.unf.conds :
+                if ci == cj : continue
                 for ck in self.unf.conds :
+                    if ck == ci or ck == cj : continue
                     vij = self.satf.var (self.__ord_pair (ci, cj))
                     vjk = self.satf.var (self.__ord_pair (cj, ck))
                     vik = self.satf.var (self.__ord_pair (ci, ck))
                     self.satf.add ([-vij, -vjk, vik])
+                    print "podisc: sat: clause", [-vij, -vjk, vik]
 
-    def __sat_encode_labels () :
+    def __sat_encode_labels (self) :
         # for each pair of events, if labels are different, they cannot be
         # merged
         for i in range (len (self.unf.events)) :
@@ -158,17 +164,17 @@ class Equivalence_finder :
                     vij = self.satf.var (self.__ord_pair (ei, ej))
                     self.satf.add ([-vij])
         
-    def __sat_encode_subset (setx, sety) :
+    def __sat_encode_subset (self, setx, sety) :
         # we generate a new variable v that holds iff
         # every element of setx shall be merged with at least one element
         # of sety
-        print "podisc: encode_subset: setx", setx, "sety", sety
+        print "podisc: sat: encode_subset: setx", setx, "sety", sety
         setx = frozenset (setx)
         sety = frozenset (sety)
-        v = self.satf.var ((setx, sety))
+        v = self.satf.var (("subset", setx, sety))
         and_clause = [v]
         for x in setx :
-            vx = self.satf.var ((x, sety))
+            vx = self.satf.var (("subset_x_match", x, sety))
             and_clause.append (-vx) # conjuntion of all or variables imply v
             clause = [-v]
             for y in sety :
@@ -179,7 +185,7 @@ class Equivalence_finder :
         self.satf.add (and_clause)
         return v
 
-    def __sat_encode_pre () :
+    def __sat_encode_pre (self) :
         # for every two events, if we decide to merge them, then the
         # presets must merge as well (the set of equivalence classes in the
         # preset of one must be equal to the set of equvalence classes in
@@ -194,10 +200,11 @@ class Equivalence_finder :
                 v1 = self.__sat_encode_subset (ei.pre, ej.pre)
                 v2 = self.__sat_encode_subset (ej.pre, ei.pre)
 
+                print "podisc: sat: encode_pre:", repr (ei), repr (ej), "(2 cls):"
                 self.satf.add ([-vij, v1])
                 self.satf.add ([-vij, v2])
 
-    def __sat_encode_post () :
+    def __sat_encode_post (self) :
         # same as for __sat_encode_pre but this time for postset
         for i in range (len (self.unf.events)) :
             for j in range (i + 1, len (self.unf.events)) :
@@ -209,23 +216,25 @@ class Equivalence_finder :
                 v1 = self.__sat_encode_subset (ei.post, ej.post)
                 v2 = self.__sat_encode_subset (ej.post, ei.post)
 
+                print "podisc: sat: encode_pre:", repr (ei), repr (ej), "(2 cls):"
                 self.satf.add ([-vij, v1])
                 self.satf.add ([-vij, v2])
 
-    def __sat_encode_co () :
+    def __sat_encode_co (self) :
         self.__compute_co_relation ()
         for (c1, c2) in self.__co :
             assert ((c1, c2) == self.__ord_pair (c1, c2))
             v = self.satf.var ((c1, c2))
+            print "podisc: sat: encode_co:", repr (c1), repr (c2)
             self.satf.add ([-v])
 
-    def __sat_encode_removal () :
+    def __sat_encode_removal (self) :
         pass
 
-    def __sat_encode_measure (k) :
+    def __sat_encode_measure (self, k) :
         pass
 
-    def smt_encode () :
+    def smt_encode (self) :
         pass
 
 def test1 () :
@@ -274,21 +283,28 @@ def test3 () :
     u.write (sys.stdout, 'dot')
 
 def test4 () :
-    u = ptnet.unfolding.Unfolding (True)
     f = open ('benchmarks/nets/small/gas_station.cuf', 'r')
-    #f = open ('out.cuf', 'r')
+    #f = open ('benchmarks/nets/small/dme2.cuf', 'r')
+    u = ptnet.unfolding.Unfolding (True)
     u.read (f)
-    u.prune_by_depth (4)
-    u.write (sys.stdout, 'dot')
-    #u.remove_event (6)
+    u.prune_by_depth (2)
     #u.write (sys.stdout, 'dot')
 
-    #print 'conditions'
-    #for c in u.conds :
-    #    print c
-    #print 'events'
-    #for e in u.events :
-    #    print e
+    finder = Equivalence_finder (u)
+    print
+    finder.sat_encode (1)
+    print
+    #f = open ('/tmp/out.cnf', 'w')
+    print repr (finder.satf)
+
+def test5 () :
+    for k in range (1, 6) :
+        u = ptnet.unfolding.Unfolding (True)
+        f = open ('benchmarks/nets/small/dme2.cuf', 'r')
+        u.read (f)
+        u.prune_by_depth (k)
+        ff = open ('dme2-pref%d.dot' % k, 'w')
+        u.write (ff, 'dot')
 
 def main () :
     # parse arguments

@@ -10,7 +10,11 @@ class Cnf (object) :
         return self.varmap[obj]
 
     def add (self, cls) :
-        self.clsset.add (frozenset (cls))
+        c = frozenset (cls)
+        print "podisc: cnf: new clause", cls
+        if c in self.clsset :
+            print "podisc: cnf: dupplicated!"
+        self.clsset.add (c)
 
     def amo_pairwise (self, l) :
         # for n >= 0 items, produces (n^2-n)/2 clauses, no new variables
@@ -139,8 +143,8 @@ class Cnf (object) :
 
     def __repr__ (self) :
         s = ''
-        for k in self.varmap :
-            s += 'c "%s" => %d\n' % (k, self.varmap[k])
+        for (k,v) in sorted (self.varmap.items (), key=lambda (k,v) : v) :
+            s += 'c %5d is "%s"\n' % (v, k)
         s += '\np cnf %d %d\n' % (len (self.varmap), len (self.clsset))
         for c in self.clsset :
             for v in c : s += str (v) + ' '
@@ -150,3 +154,4 @@ class Cnf (object) :
     def __str__ (self) :
         return self.__repr__ ()
 
+# vi:ts=4:sw=4:et:
