@@ -154,4 +154,94 @@ class Cnf (object) :
     def __str__ (self) :
         return self.__repr__ ()
 
+class Integer :
+    def __init__ (self, cnf, obj, k) :
+        # width in bits
+        self.k = k
+        # the cnf formula on which we append encodings
+        self.cnf = cnf
+        # the object on which this integer is associated
+        self.obj = obj
+
+        self.bit = []
+        for i in xrange (k) :
+            self.bit.append (cnf.var (("int-bit%d" % i, obj)))
+
+    def encode_eq (self, other) :
+        # this encodes self == other
+        # the returned variable v holds iff (self == other)
+        if other.k != self.k :
+            raise Exception, "Different bit width while encoding integer equality"
+        v = self.cnf.var (("int-eq", self.obj, other.obj))
+        vi_clause = [v]
+        for i in xrange (self.k) :
+            vi = self.cnf.var (("int-eq-aux%d" % i, self.obj, other.obj))
+            vi_clause.append (-vi)
+
+            # v -> (s[i] <-> o[i])
+            self.cnf.add ([-v, -self.bit[i], other.bit[i]])
+            self.cnf.add ([-v, -other.bit[i], self.bit[i]])
+
+            # (s[i] <-> o[i]) -> vi
+            self.cnf.add ([-self.bit[i], -other.bit[i], vi])
+            self.cnf.add ([self.bit[i], other.bit[i], vi])
+
+        # v1 ^ ... ^ vn -> v
+        self.cnf.add (vi_clause)
+        return v
+
+    def encode_lt (self, other) :
+        # this encode self < other
+        # the returned variable is such that, if it is true, then (self < other)
+        if other.k != self.k :
+            raise Exception, "Different bit width while encoding integer lt"
+
+        # three variables per bit: s[i], o[i], a[i] (a for "aux")
+        #
+        # for i >= 1:
+        #   (a[i] ^  a[i-1]) -> s[i] = o[i]
+        #   (a[i] ^ !a[i-1]) -> s[i] < o[i]
+        # for i == 0:
+        #   a[0] -> s[0] < o[0]
+        #
+        # now, to force self < other it's enough with setting a[k-1]
+        # NOTE: setting a[k-1] to false does not imply "not (self < other)"
+        #
+
+        si = self.bit[0]
+        oi = other.bit[0]
+        ai1 = self.cnf.var (("int-lt-aux0", self.obj, other.obj))
+
+        # if a[0], then s[0] < o[0]
+        self.cnf.add ([-ai1, -si])
+        self.cnf.add ([-ai1, oi])
+
+        for i in xrange (1, self.k) :
+            si = self.bit[i]
+            oi = other.bit[i]
+            ai = self.cnf.var (("int-lt-aux%d" % i, self.obj, other.obj))
+
+            # if a[i] and a[i-1], then si == oi
+            self.cnf.add ([-ai, -ai1, -si, oi])
+            self.cnf.add ([-ai, -ai1, si, -oi])
+
+            # if a[i] and not a[i-1], then si < oi
+            self.cnf.add ([-ai, ai1, -si])
+            self.cnf.add ([-ai, ai1, oi])
+
+            ai1 = ai
+
+        return ai1
+
+    def encode_eq_constant (self, n) :
+        # encode the fact that this integer equals integer n
+        if n >= (1 << self.k) :
+            raise Exception, "Bit width of %d is insufficient to encode constant %d" % (self.k, n)
+
+        for i in xrange (self.k) :
+            if n & (1 << i) :
+                self.cnf.add ([self.bit[i]])
+            else :
+                self.cnf.add ([-self.bit[i]])
+
 # vi:ts=4:sw=4:et:

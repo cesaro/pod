@@ -306,12 +306,29 @@ def test5 () :
         ff = open ('dme2-pref%d.dot' % k, 'w')
         u.write (ff, 'dot')
 
+def test6 () :
+    phi = cnf.Cnf ()
+
+    a = cnf.Integer (phi, "first", 4)
+    b = cnf.Integer (phi, "second", 4)
+    v = a.encode_lt (b)
+    print 'returned', v
+
+    print repr (phi)
+
+    phi.add ([v])
+    a.encode_eq_constant (5)
+    b.encode_eq_constant (5)
+
+    f = open ("/tmp/out.cnf", "w")
+    phi.write (f)
+
 def main () :
     # parse arguments
     # assert that input net is 1-safe!!
     pass
 
 if __name__ == '__main__' :
-    test4 ()
+    test6 ()
 
 # vi:ts=4:sw=4:et:
