@@ -67,39 +67,31 @@ class Unfolding (net.Net) :
         self.nr_gray = 0
         self.net = net.Net (sanity_check)
 
-    def rem_cond (self, nr) :
-        if self.sanity_check : self.__sane_cond_id (nr)
+    def remove_cond (self, nr) :
         c = self.conds[nr]
-        if sgl (c.pre) == None :
-            self.m0[c] = 0
-        else :
+        self.m0[c] = 0
+        if len (c.pre) :
             sgl (c.pre).post.remove (c)
         for e in c.cont : e.cont.remove (c)
         for e in c.post : e.pre.remove (c)
-        del c
         if nr != len (self.conds) - 1 :
             self.conds[nr] = self.conds[-1]
             self.conds[nr].nr = nr
-            del self.conds[-1]
+        del self.conds[-1]
+        del c
 
-    def rem_event (self, nr) :
-        if self.sanity_check : self.__sane_event_id (nr)
+    def remove_event (self, nr) :
         e = self.events[nr]
-        assert (e != None)
         for c in e.pre : c.post.remove (e)
         for c in e.cont : c.cont.remove (e)
         for c in e.post : c.pre = set ()
         if e.isblack : self.nr_black -= 1
         if e.isgray : self.nr_gray -= 1
-        del e
         if nr != len (self.events) - 1 :
-            db ('rem_event: ultimo antes del cambio', self.events[-1])
-            for x in self.events[-1].pre : db ('rem_event: pre del ultimo antes', x)
             self.events[nr] = self.events[-1]
             self.events[nr].nr = nr
-            db ('rem_event: ultimo despues del cambio', self.events[-1])
-            for x in self.events[-1].pre : db ('rem_event: pre del ultimo despues', x)
         del self.events[-1]
+        del e
 
     def read (self, f, fmt='cuf3') :
         if fmt == 'cuf' : fmt = 'cuf3'
@@ -249,7 +241,7 @@ class Unfolding (net.Net) :
                     newm[c] = 1
             m = newm
 
-        new_events = set ([e for self.enabled (m)])
+        new_events = set (self.enabled (m))
         new_conds = set ()
         mrk = self.new_mark ()
         for e in new_events :
@@ -261,9 +253,9 @@ class Unfolding (net.Net) :
         rem_conds = [c for c in self.conds if c not in new_conds]
 
         for e in rem_events :
-            self.rem_event (e.nr)
+            self.remove_event (e.nr)
         for c in rem_conds :
-            self.rem_cond (e.nr)
+            self.remove_cond (e.nr)
 
     def is_configuration (self, s) :
         pre = set ()
@@ -581,9 +573,9 @@ def test1 () :
     u = Unfolding (True)
     u.read (f, fmt='cuf')
     u.write (f1, 'dot')
-    u.rem_cond (20)
+    u.remove_cond (20)
     u.write (f2, 'dot')
-    u.rem_event (16)
+    u.remove_event (16)
     u.write (f3, 'dot')
     del u
 

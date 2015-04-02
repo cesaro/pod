@@ -12,8 +12,9 @@ except Exception, e:
     print 'ERROR!'
     print 'It seems that your python installation is missing some package.'
     print 'This tool requires, among others, argparse, and networkx'
-    print 'The runtime reported the following error:\n\n', str (e)
+    print 'The runtime reported the following error:\n\n', str (e), '\n'
     print 'You might want to use "easy_install --user PACKAGE"'
+    raise e
     sys.exit (1)
 finally :
     if sys.version_info < (2, 7, 0) or sys.version_info >= (3, 0, 0) :
@@ -255,12 +256,35 @@ def test3 () :
     u.read (f)
     u.prune_by_depth (10)
 
+def test4 () :
+    u = ptnet.unfolding.Unfolding (True)
+    f = open ('benchmarks/nets/small/gas_station.cuf', 'r')
+    u.read (f)
+
+    print 'x' * 80
+    print "before removing condition"
+    u.write (sys.stdout, 'dot')
+    print "condition"
+    print u.conds[1]
+    u.remove_cond (u.conds[1].nr)
+
+    print 'x' * 80
+    print "after removing condition"
+    u.write (sys.stdout, 'dot')
+
+    print 'x' * 80
+    print "event"
+    print u.events[0]
+    u.remove_event (u.events[0].nr)
+    print "after removing event"
+    u.write (sys.stdout, 'dot')
+
 def main () :
     # parse arguments
     # assert that input net is 1-safe!!
     pass
 
 if __name__ == '__main__' :
-    test3 ()
+    test4 ()
 
 # vi:ts=4:sw=4:et:
