@@ -1,5 +1,7 @@
 
-class Cnf (object) :
+import tempfile
+
+class Cnf :
     def __init__ (self) :
         self.varmap = {}
         self.clsset = set ()
@@ -245,5 +247,133 @@ class Integer :
                 self.cnf.add ([self.bit[i]])
             else :
                 self.cnf.add ([-self.bit[i]])
+
+class SatSolver :
+    def __init__ (self) :
+        pass
+
+    def solve (self, phi) :
+        pathin, pathout = '', ''
+        try :
+            # make temporary files for the formula and minisat's output
+            fdin, pathin = tempfile.mkstemp (suffix='cnf.py')
+            fdout, pathout = tempfile.mkstemp (suffix='cnf.py')
+            # write the formula in dimacs format
+            fin = os.fdopen (fdin, 'w')
+            fout = os.fdopen (fdout, 'r')
+            #db ('write cnf')
+            phi.write (fin)
+            fin.close ()
+            # call the solver
+            #db ('solve')
+            s, out = self.__runit (['minisat', pathin, pathout])
+            # load minisat's results
+            out = fout.readlines ()
+            fout.close ()
+        finally :
+            # remove temporary files
+            os.unlink (pathin)
+            os.unlink (pathout)
+
+        # handle errors
+        if s != 20 and s != 10 :
+            raise Exception, \
+                    'Minisat terminated with unknown exit status %d' % s
+
+        # UNSAT
+        if s == 20 :
+            return SatModel (phi, SatModel.RESULT_UNSAT)
+
+        # out is the contents of the minisat output file, of the form:
+        # SAT
+        # 1 43 591 -1 4 0
+        if len (out) != 2 :
+            raise Exception, 'Error while parsing minisat output'
+        out = out[1].split ()
+        try :
+            out = [int (x) for x in out]
+        except :
+            raise Exception, 'Error when parsing minisat output'
+
+        out = set (x for x in out if x > 0)
+        return SatModel (phi, SatModel.RESULT_SAT, out)
+
+    def __runit (self, args, timeout=-1, sh=False) :
+    #    db (args, timeout)
+        try :
+            p = subprocess.Popen (args, bufsize=8192, stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    preexec_fn=os.setsid, shell=sh)
+        except Exception :
+            raise Exception, "Unable to execute the command `minisat', is minisat installed?"
+
+    #    db ('pid', p.pid)
+        try :
+            killed = False
+            s = ''
+            p.stdin.close ()
+            if timeout > 0 :
+                tref = time.time ()
+                while True :
+                    t = timeout - (time.time () - tref)
+                    if t <= 0 : t = 0
+    #                db ('select at', time.time () - tref, t)
+                    (r, w, x) = select.select ([p.stdout], [], [p.stdout], t)
+    #                db ('return at', time.time () - tref, r, w, x)
+                    if len (r) :
+                        # read (n) waits for n bytes before returning
+                        c = p.stdout.read (1)
+                        if len (c) == 0 : break
+                        s += c
+                    else :
+    #                    db ('killing', p.pid)
+                        os.killpg (p.pid, signal.SIGTERM)
+                        killed = True
+                        break
+            p.wait ()
+            s += p.stdout.read ()
+            return (p.returncode if not killed else 254, s)
+        except KeyboardInterrupt :
+            os.killpg (p.pid, signal.SIGKILL)
+            p.wait ()
+            raise
+
+class SatModel :
+
+    # outcome of the solving
+    RESULT_SAT   = 'SAT'
+    RESULT_UNSAT = 'UNSAT'
+    RESULT_UNDEF = '?'
+
+    def __init__ (self, phi, result, satvars) :
+        self.result = result
+        self.phi = phi
+
+        self.satisfied_vars = satvars
+
+    def is_sat (self) :
+        return self.result == SatModel.RESULT_SAT
+
+    def is_unsat (self) :
+        return self.result == SatModel.RESULT_UNSAT
+
+    def is_undef (self) :
+        return self.result == SatModel.RESULT_UNDEF
+
+    def __getitem__ (self, obj) :
+        try :
+            v = self.phi.varmap[obj];
+        except KeyError :
+            raise Exception, "Error: object '%s' is not in the variable map" % obj
+        return v in self.satisfied_vars
+
+    def __iter__ (self) :
+        for k,v in self.phi.variable.items () :
+            if v in self.satisfied_vars :
+                yield k
+
+    def __repr__ (self) :
+        s = " ".join ("%s=%s" % (repr (k), v in self.satisfied_vars ? "T" : "F") for k,v in self.phi.varmap.items ())
+        return s
 
 # vi:ts=4:sw=4:et:

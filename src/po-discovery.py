@@ -29,7 +29,19 @@ finally :
 def sgl (s) :
     return (list (s))[0]
 
-class Equivalence_finder :
+class Equivalence_solver :
+    def __init__ (self, unfolding) :
+        self.unf = unfolding
+        self.satenc = Equivalence_encoding (unfolding)
+
+    def find_best (self) :
+        pass
+
+    def find_with_measure (self, k) :
+        pass
+
+
+class Equivalence_encoding :
     def __init__ (self, unfolding) :
         self.unf = unfolding
         self.satf = None
@@ -342,11 +354,19 @@ def test6 () :
     a.encode_eq_constant (5)
     b.encode_eq_constant (5)
 
-    f = open ("/tmp/out.cnf", "w")
-    phi.write (f)
+    solver = cnf.SatSolver ()
+
+    model = solver.solve (phi)
+    print 'SAT  ', model.is_sat ()
+    print 'UNSAT', model.is_unsat ()
+    print 'UNDEF', model.is_undef ()
+
+    print 'model'
+    print repr (model)
 
 def test7 () :
     # events, conditions, k, vars, clauses, k, minisat time, answer
+    pass
 
 def main () :
     # parse arguments
