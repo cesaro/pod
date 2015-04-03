@@ -1,5 +1,10 @@
 
+import os
+import time
+import select
+import signal
 import tempfile
+import subprocess
 
 class Cnf :
     def __init__ (self) :
@@ -13,9 +18,8 @@ class Cnf :
 
     def add (self, cls) :
         c = frozenset (cls)
-        print "podisc: cnf: new clause", cls
-        if c in self.clsset :
-            print "podisc: cnf: dupplicated!"
+        #print "podisc: cnf: new clause", cls
+        #if c in self.clsset : print "podisc: cnf: dupplicated!"
         self.clsset.add (c)
 
     def amo_pairwise (self, l) :
@@ -252,12 +256,12 @@ class SatSolver :
     def __init__ (self) :
         pass
 
-    def solve (self, phi) :
+    def solve (self, phi, timeout=-1) :
         pathin, pathout = '', ''
         try :
             # make temporary files for the formula and minisat's output
-            fdin, pathin = tempfile.mkstemp (suffix='cnf.py')
-            fdout, pathout = tempfile.mkstemp (suffix='cnf.py')
+            fdin, pathin = tempfile.mkstemp (suffix='.cnf.py.cnf')
+            fdout, pathout = tempfile.mkstemp (suffix='.cnf.py.cnf')
             # write the formula in dimacs format
             fin = os.fdopen (fdin, 'w')
             fout = os.fdopen (fdout, 'r')
@@ -266,7 +270,7 @@ class SatSolver :
             fin.close ()
             # call the solver
             #db ('solve')
-            s, out = self.__runit (['minisat', pathin, pathout])
+            s, out = self.__runit (['minisat', pathin, pathout], timeout)
             # load minisat's results
             out = fout.readlines ()
             fout.close ()
@@ -276,9 +280,13 @@ class SatSolver :
             os.unlink (pathout)
 
         # handle errors
-        if s != 20 and s != 10 :
+        if s != 20 and s != 10 and s != 254 :
             raise Exception, \
                     'Minisat terminated with unknown exit status %d' % s
+
+        # UNDEF (killed due to timeout)
+        if s == 254 :
+            return SatModel (phi, SatModel.RESULT_UNDEF)
 
         # UNSAT
         if s == 20 :
@@ -299,7 +307,7 @@ class SatSolver :
         return SatModel (phi, SatModel.RESULT_SAT, out)
 
     def __runit (self, args, timeout=-1, sh=False) :
-    #    db (args, timeout)
+        print "podisc: cnf:", args, "timeout", timeout
         try :
             p = subprocess.Popen (args, bufsize=8192, stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -345,10 +353,12 @@ class SatModel :
     RESULT_UNSAT = 'UNSAT'
     RESULT_UNDEF = '?'
 
-    def __init__ (self, phi, result, satvars) :
+    def __init__ (self, phi, result, satvars=None) :
         self.result = result
         self.phi = phi
 
+        if satvars == None :
+            satvars = set ()
         self.satisfied_vars = satvars
 
     def is_sat (self) :
@@ -361,6 +371,8 @@ class SatModel :
         return self.result == SatModel.RESULT_UNDEF
 
     def __getitem__ (self, obj) :
+        if self.result != SatModel.RESULT_SAT :
+            raise Exception, "The formula is unsatisfiable"
         try :
             v = self.phi.varmap[obj];
         except KeyError :
@@ -368,12 +380,21 @@ class SatModel :
         return v in self.satisfied_vars
 
     def __iter__ (self) :
+        if self.result != SatModel.RESULT_SAT :
+            raise Exception, "The formula is unsatisfiable"
         for k,v in self.phi.variable.items () :
             if v in self.satisfied_vars :
                 yield k
 
     def __repr__ (self) :
-        s = " ".join ("%s=%s" % (repr (k), v in self.satisfied_vars ? "T" : "F") for k,v in self.phi.varmap.items ())
+        return self.result
+
+    def __str__ (self) :
+        s = repr (self)
+        if self.result != SatModel.RESULT_SAT : return s
+        s += "\n"
+        for (k,v) in sorted (self.phi.varmap.items (), key=lambda (k,v) : v) :
+            s += " %s  %4d %s\n" % ("T" if v in self.satisfied_vars else "F", v, repr (k))
         return s
 
 # vi:ts=4:sw=4:et:

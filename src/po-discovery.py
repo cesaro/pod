@@ -29,7 +29,7 @@ finally :
 def sgl (s) :
     return (list (s))[0]
 
-class Equivalence_solver :
+class EquivalenceSolver :
     def __init__ (self, unfolding) :
         self.unf = unfolding
         self.satenc = Equivalence_encoding (unfolding)
@@ -41,7 +41,7 @@ class Equivalence_solver :
         pass
 
 
-class Equivalence_encoding :
+class EquivalenceEncoding :
     def __init__ (self, unfolding) :
         self.unf = unfolding
         self.satf = None
@@ -73,7 +73,7 @@ class Equivalence_encoding :
             self.__compute_co_relation_c (c)
 
     def __compute_co_relation_c (self, cgoal) :
-        print "podisc: compute_co: goal", repr (cgoal)
+        #print "podisc: compute_co: goal", repr (cgoal)
         mpast = self.unf.new_mark ()
         mfuture = self.unf.new_mark ()
 
@@ -88,8 +88,8 @@ class Equivalence_encoding :
                 cc.m = mpast
                 work.append (cc)
         consumed = work
-        print "podisc: compute_co:  past"
-        print "podisc: compute_co: ", work
+        #print "podisc: compute_co:  past"
+        #print "podisc: compute_co: ", work
 
         # mark conditions that consume conditions in work (future of cgoal
         # or conflict)
@@ -100,8 +100,8 @@ class Equivalence_encoding :
                 for cc in e.post :
                     cc.m = mfuture
                     work.append (cc)
-        print "podisc: compute_co:  past and future"
-        print "podisc: compute_co: ", work
+        #print "podisc: compute_co:  past and future"
+        #print "podisc: compute_co: ", work
 
         # at this point
         # - conds marked with mpast   : have been consumed to mark cgoal
@@ -113,14 +113,9 @@ class Equivalence_encoding :
             if c != cgoal :
                 l.append (c)
                 self.__co.add (self.__ord_pair (cgoal, c))
-        print "podisc: compute_co:  co"
-        print "podisc: compute_co: ", l
-        print "podisc: compute_co:  total", len (l)
-
-    # def __are_co_assert (c1, c2) :
-    #     # if they are siblings, then they are surely concurrent
-    #     if len (c1.pre) and len (c2.pre) :
-    #         if sgl (c1.pre) == sgl (c2.pre) : return True
+        #print "podisc: compute_co:  co"
+        #print "podisc: compute_co: ", l
+        #print "podisc: compute_co:  total", len (l)
 
     def sat_encode (self, k) :
         self.satf = cnf.Cnf ()
@@ -151,7 +146,7 @@ class Equivalence_encoding :
                     vjk = self.satf.var (self.__ord_pair (ej, ek))
                     vik = self.satf.var (self.__ord_pair (ei, ek))
                     self.satf.add ([-vij, -vjk, vik])
-                    print "podisc: sat: clause", repr (ei), repr (ej), repr (ek), [-vij, -vjk, vik]
+                    #print "podisc: sat: clause", repr (ei), repr (ej), repr (ek), [-vij, -vjk, vik]
 
         # conditions with conditions
         for ci in self.unf.conds :
@@ -163,7 +158,7 @@ class Equivalence_encoding :
                     vjk = self.satf.var (self.__ord_pair (cj, ck))
                     vik = self.satf.var (self.__ord_pair (ci, ck))
                     self.satf.add ([-vij, -vjk, vik])
-                    print "podisc: sat: clause", [-vij, -vjk, vik]
+                    #print "podisc: sat: clause", [-vij, -vjk, vik]
 
     def __sat_encode_labels (self) :
         # for each pair of events, if labels are different, they cannot be
@@ -180,7 +175,7 @@ class Equivalence_encoding :
         # we generate a new variable v that holds iff
         # every element of setx shall be merged with at least one element
         # of sety
-        print "podisc: sat: encode_subset: setx", setx, "sety", sety
+        #print "podisc: sat: encode_subset: setx", setx, "sety", sety
         setx = frozenset (setx)
         sety = frozenset (sety)
         v = self.satf.var (("subset", setx, sety))
@@ -212,7 +207,7 @@ class Equivalence_encoding :
                 v1 = self.__sat_encode_subset (ei.pre, ej.pre)
                 v2 = self.__sat_encode_subset (ej.pre, ei.pre)
 
-                print "podisc: sat: encode_pre:", repr (ei), repr (ej), "(2 cls):"
+                #print "podisc: sat: encode_pre:", repr (ei), repr (ej), "(2 cls):"
                 self.satf.add ([-vij, v1])
                 self.satf.add ([-vij, v2])
 
@@ -228,7 +223,7 @@ class Equivalence_encoding :
                 v1 = self.__sat_encode_subset (ei.post, ej.post)
                 v2 = self.__sat_encode_subset (ej.post, ei.post)
 
-                print "podisc: sat: encode_pre:", repr (ei), repr (ej), "(2 cls):"
+                #print "podisc: sat: encode_pre:", repr (ei), repr (ej), "(2 cls):"
                 self.satf.add ([-vij, v1])
                 self.satf.add ([-vij, v2])
 
@@ -237,7 +232,7 @@ class Equivalence_encoding :
         for (c1, c2) in self.__co :
             assert ((c1, c2) == self.__ord_pair (c1, c2))
             v = self.satf.var ((c1, c2))
-            print "podisc: sat: encode_co:", repr (c1), repr (c2)
+            #print "podisc: sat: encode_co:", repr (c1), repr (c2)
             self.satf.add ([-v])
 
     def __sat_encode_measure (self, k) :
@@ -245,7 +240,7 @@ class Equivalence_encoding :
         bitwith = int (math.ceil (math.log (1 + len (self.unf.events), 2)))
         intmap = {}
         for e in self.unf.events :
-            intmap[e] = cnf.Integer (self.cnf, e, bitwith)
+            intmap[e] = cnf.Integer (self.satf, e, bitwith)
         
         # for every two events, if they are merged, the integers must equal
         for i in range (len (self.unf.events)) :
@@ -257,13 +252,13 @@ class Equivalence_encoding :
                 intmap[ei].encode_eq (intmap[ej], vij)
 
         # we generate one more integer for the bound
-        bound = cnf.Integer (self, cnf, "bound (k+1)", bitwith)
+        bound = cnf.Integer (self.satf, "bound (k+1)", bitwith)
         bound.encode_eq_constant (k + 1)
 
         # the integer associated to any event must be smaller than the bound
         for encint in intmap.values () :
             v = encint.encode_lt (bound)
-            self.cnf.add ([v])
+            self.satf.add ([v])
 
     def __sat_encode_removal (self) :
         pass
@@ -317,12 +312,14 @@ def test3 () :
     u.write (sys.stdout, 'dot')
 
 def test4 () :
-    f = open ('benchmarks/nets/small/gas_station.cuf', 'r')
+    #f = open ('benchmarks/nets/small/gas_station.cuf', 'r')
     #f = open ('benchmarks/nets/small/dme2.cuf', 'r')
+    f = open ('benchmarks/nets/small/ab_gesc.cuf', 'r')
     u = ptnet.unfolding.Unfolding (True)
     u.read (f)
-    u.prune_by_depth (2)
-    #u.write (sys.stdout, 'dot')
+    u.prune_by_depth (8)
+    u.write (sys.stdout, 'dot')
+    return
 
     finder = Equivalence_finder (u)
     print
@@ -352,7 +349,7 @@ def test6 () :
 
     phi.add ([v])
     a.encode_eq_constant (5)
-    b.encode_eq_constant (5)
+    b.encode_eq_constant (4)
 
     solver = cnf.SatSolver ()
 
@@ -362,24 +359,74 @@ def test6 () :
     print 'UNDEF', model.is_undef ()
 
     print 'model'
-    print repr (model)
+    print model
 
 def test7 () :
-    # events, conditions, k, vars, clauses, k, minisat time, answer
-    pass
+
+    # events, conditions, k, vars, clauses, minisat time, answer
+    results = []
+
+    for depth in range (1, 20) :
+        u = ptnet.unfolding.Unfolding (True)
+        #f = open ('benchmarks/nets/small/dme2.cuf', 'r')
+        f = open ('benchmarks/nets/small/ab_gesc.cuf', 'r')
+        u.read (f)
+        u.prune_by_depth (depth)
+
+        stat_events = len (u.events)
+        stat_conds = len (u.conds)
+        
+        k100 = len (u.events)
+        k75 = len (u.events) * 0.75
+        k50 = len (u.events) * 0.50
+        k25 = len (u.events) * 0.25
+
+        for k in [k100, k75, k50, k25] :
+        #for k in [k100, k75, k25] :
+            k = int (k)
+            enc = EquivalenceEncoding (u)
+            enc.sat_encode (k)
+
+            stat_k = k
+            stat_nvars = len (enc.satf.varmap)
+            stat_nclss = len (enc.satf.clsset)
+
+            solver = cnf.SatSolver ()
+
+            tstart = time.time ()
+            model = solver.solve (enc.satf, 60)
+            tend = time.time ()
+
+            stat_runtime = tend - tstart
+            stat_answer = model.result
+
+            res = (stat_events, \
+                    stat_conds, \
+                    stat_k, \
+                    stat_nvars, \
+                    stat_nclss, \
+                    stat_runtime, \
+                    stat_answer)
+            results.append (res)
+
+        print "events\tconds\tk\tnvars\tnclaus\truntime\tanswer"
+        for (nre, nrc, k, nv, nc, t, a) in results :
+            s = "%d\t%d\t%d\t%d\t%d\t%.2f\t%s" % (nre, nrc, k, nv, nc, t, a)
+            print s
 
 def main () :
     # parse arguments
     # assert that input net is 1-safe!!
 
     # TODO
-    # - support for reading the model and building a Merge_equivalence
+    # x support for reading the model
+    # - and building a Merge_equivalence
     # - support for merging the unfolding given a Merge_equivalence
     # - debug on some small example, start with gas_station.cuf, depth=2,3,4
 
     pass
 
 if __name__ == '__main__' :
-    test6 ()
+    test7 ()
 
 # vi:ts=4:sw=4:et:
