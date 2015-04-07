@@ -45,7 +45,7 @@ class EquivalenceEncoding :
     def __init__ (self, unfolding) :
         self.unf = unfolding
         self.satf = None
-        self.smtf = None
+        self.z3 = None
         self.__co = None
 
         self.__compute_co_relation ()
@@ -63,11 +63,12 @@ class EquivalenceEncoding :
             return (y, x)
 
     def are_co (self, c1, c2) :
-        if self.co == None :
-            self.__compute_co_relation ()
+        self.__compute_co_relation ()
         return self.__ord_pair (c1, c2) in self.__co
 
-    def __compute_co_relation (self, ) :
+    def __compute_co_relation (self) :
+        if self.__co != None :
+            return
         self.__co = set ()
         for c in self.unf.conds :
             self.__compute_co_relation_c (c)
@@ -201,6 +202,7 @@ class EquivalenceEncoding :
             for j in range (i + 1, len (self.unf.events)) :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
+                if ei.label != ej.label : continue # optimization
                 vij = self.satf.var (self.__ord_pair (ei, ej))
 
                 # subset inclusion in both directions
@@ -217,6 +219,7 @@ class EquivalenceEncoding :
             for j in range (i + 1, len (self.unf.events)) :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
+                if ei.label != ej.label : continue # optimization
                 vij = self.satf.var (self.__ord_pair (ei, ej))
 
                 # subset inclusion in both directions
@@ -263,8 +266,107 @@ class EquivalenceEncoding :
     def __sat_encode_removal (self) :
         pass
 
-    def smt_encode (self) :
+    def __smt_assert_repr (self) :
+
+        # assert that the repr() of all events and conditions is different
+        reprs = set ()
+        for e in self.unf.events :
+            assert (repr (e) not in reprs)
+            reprs.add (repr (e))
+        for c in self.unf.conds :
+            assert (repr (c) not in reprs)
+            reprs.add (repr (c))
+
+    def smt_encode (self, k) :
+
+        # assert that the unfolding is in right shape and create the solver
+        self.__smt_assert_repr ()
+        self.z3 = z3.Solver ()
+
+        # equivalence: nothing to do !!
+
+        # IP : it preserves independence
+        self.__smt_encode_labels ()
+        return
+        self.__smt_encode_pre_post ()
+        self.__smt_encode_co ()
+
+        # RA: does not merge removed events
+        self.__smt_encode_removal ()
+
+        # MET : the measure of the folded net is at most k
+        self.__smt_encode_measure (k)
+
+    def __smt_encode_labels (self) :
+        for i in range (len (self.unf.events)) :
+            for j in range (i + 1, len (self.unf.events)) :
+                ei = self.unf.events[i]
+                ej = self.unf.events[j]
+                if ei.label != ej.label :
+                    x_ei = self.__smt_varmap (ei)
+                    x_ej = self.__smt_varmap (ej)
+                    self.z3.add (x_ei != x_ej)
+
+    def __smt_encode_pre_post (self, which = "pre_and_post") :
+        for i in range (len (self.unf.events)) :
+            for j in range (i + 1, len (self.unf.events)) :
+                ei = self.unf.events[i]
+                ej = self.unf.events[j]
+                if ei.label != ej.label : continue # optimization
+
+                xi = self.__smt_varmap (ei)
+                xj = self.__smt_varmap (ej)
+
+                s = "merge-%s-%s-%s" % (which, repr (ei), repr (ej))
+                b = z3.Bool (s)
+                self.z3.add (z3.Implies (xi == xj, b))
+                #b = (xi == xj)
+
+                if which in ["pre", "pre_and_post"] :
+                    self.__smt_encode_subset (ei.pre, ej.pre, b)
+                    self.__smt_encode_subset (ej.pre, ei.pre, b)
+                if which in ["post", "pre_and_post"] :
+                    self.__smt_encode_subset (ei.post, ej.post, b)
+                    self.__smt_encode_subset (ej.post, ei.post, b)
+
+    def __smt_encode_co (self) :
+        self.__compute_co_relation ()
+        for (c1, c2) in self.__co :
+            assert ((c1, c2) == self.__ord_pair (c1, c2))
+
+            x1 = self.__smt_varmap (c1)
+            x2 = self.__smt_varmap (c2)
+
+            #print "podisc: sat: encode_co:", repr (c1), repr (c2)
+            self.z3.add (x1 != x2)
+
+    def __smt_encode_removal (self) :
         pass
+
+    def __smt_encode_measure (self, k) :
+        # for each event e, x_e must be smaller or equal to k
+        for e in self.unf.events :
+            x = self.__smt_varmap (e)
+            self.z3.add (x <= k)
+
+    def __smt_encode_subset (self, setx, sety, b = None) :
+        # each element of setx must be merged to some element of sety
+        # this function generates and returns a boolean variable that, if it is
+        # true, then subset inclusion happens
+        l = []
+        for x in setx :
+            vx = self.__smt_varmap (x)
+            cons = z3.Or ([vx == self.__smt_varmap (y) for y in sety])
+            l.append (cons)
+        if b == None :
+            s = "merge-subset-%s-%s" % (repr (setx), repr (sety))
+            b = z3.Bool (s)
+        self.z3.add (z3.Implies (b, z3.And (l)))
+        return b
+
+    def __smt_varmap (self, item) :
+        return z3.Int (repr (item))
+
 
 def test1 () :
     n = ptnet.net.Net (True)
@@ -414,6 +516,89 @@ def test7 () :
             s = "%d\t%d\t%d\t%d\t%d\t%.2f\t%s" % (nre, nrc, k, nv, nc, t, a)
             print s
 
+def test8 () :
+    import z3
+
+    x = z3.Int ('x')
+    y = z3.Int ('y')
+    s = z3.Solver ()
+
+    print 'id of x     :', id (x)
+    print 'id of y     :', id (y)
+    print 'id of x (1) :', id (z3.Int ('x'))
+    print 'id of y (1) :', id (z3.Int ('y'))
+
+    z1 = z3.Int ('z')
+    z2 = z3.Int ('z')
+
+    print 'id of z1 :', id (z1)
+    print 'id of z2 :', id (z2)
+
+    s.add (y != x)
+    s.add (x >= y)
+    s.add (z1 == z2)
+
+    expr = z3.Or ([z3.Int ('i%d' % i) == y for i in range (4)])
+    print 'final expression', expr
+    s.add (expr)
+    expr = z3.Or (x == y)
+    expr = z3.Or (expr, x == z1)
+    expr = z3.Or (expr, x == z2)
+    s.add (expr)
+    print 'second final expression', expr
+
+    print 'constraints to solve:', s
+
+    c = s.check ()
+    print 'result:', c
+    if c == z3.sat :
+        m = s.model ()
+        print 'model:', m
+    return
+
+    print 'type model', type (m)
+    print m[0]
+    print 'type 0', type (m[0])
+    print 'type constrain', type (y > 1023)
+    print 'm[x]', type (m[x].as_long ())
+    print 'm[x]', type (m[x].as_string ())
+    print 'type m[x]', type (m[x])
+
+def test9 () :
+    import z3
+
+    s = z3.Solver ()
+
+    x = z3.Int ('x')
+    y = z3.Int ('y')
+
+    p = z3.Bool ('p')
+
+    s.add (p == (x == y))
+    s.add (x == y)
+    s.add (z3.Not (p))
+
+    print 'solving', s
+    r = s.check ()
+    print 'result:', r
+    if r == z3.sat :
+        m = s.model ()
+        print 'model:', m
+
+def test10 () :
+    f = open ('benchmarks/nets/small/ab_gesc.cuf', 'r')
+    u = ptnet.unfolding.Unfolding (True)
+    u.read (f)
+    u.prune_by_depth (2)
+    u.write (sys.stdout, 'dot')
+
+    enc = EquivalenceEncoding (u)
+    print
+    enc.smt_encode (1)
+    print
+    #f = open ('/tmp/out.cnf', 'w')
+    print enc.z3
+
 def main () :
     # parse arguments
     # assert that input net is 1-safe!!
@@ -427,6 +612,6 @@ def main () :
     pass
 
 if __name__ == '__main__' :
-    test7 ()
+    test10 ()
 
 # vi:ts=4:sw=4:et:

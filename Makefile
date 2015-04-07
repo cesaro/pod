@@ -3,10 +3,8 @@ include defs.mk
 
 .PHONY: fake all g test clean distclean prof dist
 
-all: tags
-	#./src/cunf/cunf examples/tiny/numh.ll_net  --save out.cuf input
-	#./src/cunf/cunf -vvv examples/tiny/pag9.ll_net  --save out.cuf input
-	#./src/pep2pt examples/plain/small/dme2.ll_net
+all:
+	./src/po-discovery.py
 
 bench_build_unfoldings :
 	for i in benchmarks/nets/*.ll_net; do echo $i; j=`echo $i | sed 's/.ll_net//'`; echo $j; cunf -v $i -s $j.cuf; done
