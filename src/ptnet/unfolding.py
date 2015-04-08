@@ -84,6 +84,10 @@ class Unfolding (net.Net) :
             self.conds[nr].nr = nr
         del self.conds[-1]
 
+        c.label.inverse_label.remove (c)
+        if len (c.label.inverse_label) == 0 :
+            self.net.places.remove (c.label)
+
     def remove_event (self, nr) :
         e = self.events[nr]
         for c in e.pre :
@@ -101,6 +105,10 @@ class Unfolding (net.Net) :
             self.events[nr] = self.events[-1]
             self.events[nr].nr = nr
         del self.events[-1]
+
+        e.label.inverse_label.remove (e)
+        if len (e.label.inverse_label) == 0 :
+            self.net.trans.remove (e.label)
 
     def read (self, f, fmt='cuf3') :
         if fmt == 'cuf' : fmt = 'cuf3'
@@ -214,12 +222,24 @@ class Unfolding (net.Net) :
             # db ('place idx', i, 'name', l[nrt + i])
 
         # db (self.__dict__)
+        self.do_inverse_labelling ()
 
         if self.sanity_check :
             for e in self.events :
                 if not e.pre and not e.cont :
                     raise Exception, 'Event %s has empty preset+context' \
                             % repr (e)
+
+    def do_inverse_labelling (self) :
+        for t in self.net.trans :
+            t.inverse_label = set ()
+        for p in self.net.places :
+            p.inverse_label = set ()
+
+        for e in self.events :
+            e.label.inverse_label.add (e)
+        for c in self.conds :
+            c.label.inverse_label.add (c)
 
     def run_of (self, conf) :
         # TODO: implement the topological sort by hand

@@ -90,3 +90,9 @@ bound(k) ::
   for every label a and every event e in h'(a) :
   0 <= x_e < x_a
 
+
+TODO
+----
+ - use (distinct x y) on preset and postset of every event
+ - better encoding for the counting on each label, with bit vectors??
+ - switch to old encoding for conditions: v_b1,b2, if some number is small ??

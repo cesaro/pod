@@ -62,11 +62,38 @@ class EquivalenceEncoding :
         # nr of events, conditions, labels
         # int variables, constraints
         d = {}
-        d['unf.events']        = len (self.unf.events)
-        d['unf.conditions']    = len (self.unf.conds)
-        d['labels.events']     = len (self.unf.net.trans)
-        d['labels.conditions'] = len (self.unf.net.places)
-        d['k']                 = self.k
+        d['unf.events']         = len (self.unf.events)
+        d['unf.conditions']     = len (self.unf.conds)
+        d['labels.transitions'] = len (self.unf.net.trans)
+        d['labels.places']      = len (self.unf.net.places)
+        d['k']                  = self.k
+
+        # distribution of events per label
+        distrib = {}
+        histo = {}
+        s = ""
+        avg = 0
+        nmin = len (self.unf.net.trans[0].inverse_label)
+        nmax = -1
+        for t in self.unf.net.trans :
+            n = len (t.inverse_label)
+            distrib[t] = n
+            try :
+                histo[n] += 1
+            except KeyError :
+                histo[n] = 1
+            s += "%s=%d " % (repr (t), n)
+
+            if n < nmin : nmin = n
+            if n > nmax : nmax = n
+            avg += n
+
+        avg /= len (self.unf.net.trans)
+
+        d['labels.distrib'] = s
+        d['labels.distrib.min/max/avg'] = (nmin, nmax, avg)
+        d['labels.histogram'] = histo
+
         if self.z3 :
             d['z3.constaints'] = len (self.z3.assertions())
         return d        
@@ -292,8 +319,15 @@ class EquivalenceEncoding :
         for c in self.unf.conds :
             assert (repr (c) not in reprs)
             reprs.add (repr (c))
+        for t in self.unf.net.trans :
+            assert (len (t.inverse_label) != 0)
+            assert (repr (t) not in reprs)
+            reprs.add (repr (t))
 
-    def smt_encode (self, k) :
+        # not needed so far
+        # for p in self.unf.net.places : assert (len (p.inverse_label) != 0)
+
+    def smt_encode_1 (self, k) :
 
         # assert that the unfolding is in right shape and create the solver
         self.k = k
@@ -303,18 +337,18 @@ class EquivalenceEncoding :
         # equivalence: nothing to do !!
 
         # IP : it preserves independence
-        self.__smt_encode_labels ()
+        self.__smt_encode_labels_1 ()
         self.__smt_encode_pre_post ()
-        self.__smt_encode_co ()
+        self.__smt_encode_co_1 ()
 
         # RA: does not merge removed events
         self.__smt_encode_removal ()
 
         # MET : the measure of the folded net is at most k
-        self.__smt_encode_measure (k)
+        self.__smt_encode_measure_1 (k)
         return
 
-    def __smt_encode_labels (self) :
+    def __smt_encode_labels_1 (self) :
         for i in range (len (self.unf.events)) :
             for j in range (i + 1, len (self.unf.events)) :
                 ei = self.unf.events[i]
@@ -330,7 +364,7 @@ class EquivalenceEncoding :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
                 #print "podisc: smt: pre_post: ei", repr (ei), "ej", repr (ej)
-                if ei.label != ej.label : continue # optimization
+                if ei.label != ej.label : continue # important optimization
                 #print "podisc: smt: pre_post: after!"
 
                 xi = self.__smt_varmap (ei)
@@ -348,7 +382,7 @@ class EquivalenceEncoding :
                     self.__smt_encode_subset (ei.post, ej.post, b)
                     self.__smt_encode_subset (ej.post, ei.post, b)
 
-    def __smt_encode_co (self) :
+    def __smt_encode_co_1 (self) :
         self.__compute_co_relation ()
         for (c1, c2) in self.__co :
             assert ((c1, c2) == self.__ord_pair (c1, c2))
@@ -362,7 +396,7 @@ class EquivalenceEncoding :
     def __smt_encode_removal (self) :
         pass
 
-    def __smt_encode_measure (self, k) :
+    def __smt_encode_measure_1 (self, k) :
         # for each event e, x_e must be smaller or equal to k
         for e in self.unf.events :
             x = self.__smt_varmap (e)
@@ -387,6 +421,70 @@ class EquivalenceEncoding :
     def __smt_varmap (self, item) :
         return z3.Int (repr (item))
 
+    def smt_encode_2 (self, k) :
+
+        # assert that the unfolding is in right shape and create the solver
+        self.k = k
+        self.__smt_assert_repr ()
+        self.z3 = z3.Solver ()
+
+        # equivalence: nothing to do !!
+
+        # IP : it preserves independence
+        self.__smt_encode_pre_post ()
+        self.__smt_encode_co_2 ()
+
+        # RA: does not merge removed events
+        #self.__smt_encode_removal_2 ()
+
+        # MET : the measure of the folded net is at most k
+        self.__smt_encode_measure_2 (k)
+        return
+
+    def __smt_encode_co_2 (self) :
+        self.__compute_co_relation ()
+        for (c1, c2) in self.__co :
+            assert ((c1, c2) == self.__ord_pair (c1, c2))
+
+            if not self.__smt_encode_co_2_need_to (c1, c2) :
+                #print "podisc: smt_2: co: not needed", repr (c1), repr (c2)
+                continue
+
+            #print "podisc: smt_2: co: needed", repr (c1), repr (c2)
+            x1 = self.__smt_varmap (c1)
+            x2 = self.__smt_varmap (c2)
+
+            #print "podisc: sat: encode_co:", repr (c1), repr (c2)
+            self.z3.add (x1 != x2)
+
+    def __smt_encode_co_2_need_to (self, c1, c2) :
+        #m1 = self.unf.new_mark ()
+        #m2 = self.unf.new_mark ()
+        #for e in c1.post :
+        #    e.label.m = m1
+        #for e in c2.post :
+        #    if e.label == m1 : return True
+        #for e in c2.post :
+        #    e.label = m2
+        #for e in c1.post :
+        #    if e.label == m2 : return True
+
+        if len (set (e.label for e in c1.post) & set (e.label for e in c2.post)) :
+            return True
+        if len (set (e.label for e in c1.pre) & set (e.label for e in c2.pre)) :
+            return True
+        return False
+
+    def __smt_encode_measure_2 (self, k) :
+        # the number of merged transitions in each label must be under k
+        self.z3.add (sum (self.__smt_varmap (t) for t in self.unf.net.trans) <= k)
+
+        # for each label, and each event e in h' (a)
+        for t in self.unf.net.trans :
+            y = self.__smt_varmap (t)
+            for e in t.inverse_label :
+                x = self.__smt_varmap (e)
+                self.z3.add (z3.And (0 <= x, x < y))
 
 def test1 () :
     n = ptnet.net.Net (True)
@@ -485,6 +583,10 @@ def test6 () :
 
 def test7 () :
 
+    #switch = 'sat'
+    #switch = 'smt1'
+    switch = 'smt2'
+
     # events, conditions, k, vars, clauses, minisat time, answer
     results = []
 
@@ -505,25 +607,50 @@ def test7 () :
 
         for k in [k100, k75, k50, k25] :
         #for k in [k100, k75, k25] :
+        #for k in [len (u.net.trans)] :
             k = int (k)
             enc = EquivalenceEncoding (u)
-            enc.sat_encode (k)
 
             stat_k = k
-            stat_nvars = len (enc.satf.varmap)
-            stat_nclss = len (enc.satf.clsset)
+            stat_labels = len (u.net.trans)
 
-            solver = cnf.SatSolver ()
+            if switch == 'sat' :
+                enc.sat_encode (k)
 
-            tstart = time.time ()
-            model = solver.solve (enc.satf, 60)
-            tend = time.time ()
+                stat_nvars = len (enc.satf.varmap)
+                stat_nclss = len (enc.satf.clsset)
+                solver = cnf.SatSolver ()
+
+                tstart = time.time ()
+                model = solver.solve (enc.satf, 60)
+                tend = time.time ()
+
+                stat_answer = model.result
+
+            elif switch == 'smt2' :
+                enc.smt_encode_2 (k)
+
+                stat_nvars = 0
+                stat_nclss = len (enc.z3.assertions ())
+
+                enc.z3.set ("timeout", 1000 * 60)
+                tstart = time.time ()
+                result = enc.z3.check ()
+                tend = time.time ()
+
+                if result == z3.sat :
+                    stat_answer = 'sat'
+                elif result == z3.unsat :
+                    stat_answer = 'unsat'
+                else :
+                    stat_answer = '?'
 
             stat_runtime = tend - tstart
-            stat_answer = model.result
 
-            res = (stat_events, \
+            res = (depth,
+                    stat_events, \
                     stat_conds, \
+                    stat_labels, \
                     stat_k, \
                     stat_nvars, \
                     stat_nclss, \
@@ -531,9 +658,10 @@ def test7 () :
                     stat_answer)
             results.append (res)
 
-        print "events\tconds\tk\tnvars\tnclaus\truntime\tanswer"
-        for (nre, nrc, k, nv, nc, t, a) in results :
-            s = "%d\t%d\t%d\t%d\t%d\t%.2f\t%s" % (nre, nrc, k, nv, nc, t, a)
+        print "depth\tevents\tconds\tlabels\tk\tnvars\tnclaus\truntime\tanswer"
+        for (d, nre, nrc, nrl, k, nv, nc, t, a) in results :
+            s = "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%.2f\t%s" % \
+                    (d, nre, nrc, nrl, k, nv, nc, t, a)
             print s
 
 def test8 () :
@@ -591,12 +719,14 @@ def test9 () :
 
     x = z3.Int ('x')
     y = z3.Int ('y')
+    z = z3.Int ('z')
 
     p = z3.Bool ('p')
 
     s.add (p == (x == y))
     s.add (x == y)
     s.add (z3.Not (p))
+    s.add (0 <= sum ([y, z], x))
 
     print 'solving', s
     r = s.check ()
@@ -610,25 +740,33 @@ def test10 () :
     u = ptnet.unfolding.Unfolding (True)
     u.read (f)
     print 'prunning'
-    u.prune_by_depth (2)
+    u.prune_by_depth (15)
     #u.write (sys.stdout, 'dot')
 
     enc = EquivalenceEncoding (u)
     print 'building encoding'
-    enc.smt_encode (16)
+    enc.smt_encode_2 (43)
     print 'xxxxxxxxxxxxxxxxxxxxxxxxxx'
-    for cons in enc.z3.assertions () : print cons
+    #for cons in enc.z3.assertions () : print '(', cons, ')'
     #print enc.z3.to_smt2 ()
     print 'xxxxxxxxxxxxxxxxxxxxxxxxxx'
 
     print_stats (sys.stdout, enc.stats ())
-    print 'solving'
-    enc.z3.set ("timeout", 1000 * 60)
+
+    print 'solvingggggggggggggggggggggggggggggggggggggggggggggggggg'
+    enc.z3.set ("timeout", 1000 * 50)
+    tstart = time.time ()
     r = enc.z3.check ()
+    tend = time.time ()
+
     print 'result:', r
     if r == z3.sat :
         m = enc.z3.model ()
-        print 'model:', m
+        #print 'model:', m
+
+    print 'z3 running time: %.2f' % (tend - tstart)
+    print 'z3 satistics'
+    print enc.z3.statistics ()
 
 
 def print_stats (f, d) :
@@ -654,6 +792,6 @@ def main () :
     pass
 
 if __name__ == '__main__' :
-    test10 ()
+    test7 ()
 
 # vi:ts=4:sw=4:et:
