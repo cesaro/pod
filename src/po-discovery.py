@@ -9,6 +9,7 @@ try :
     import argparse
     import ptnet
     import cnf
+    import z3
 except Exception, e:
     print 'ERROR!'
     print 'It seems that your python installation is missing some package.'
@@ -46,6 +47,7 @@ class EquivalenceEncoding :
         self.unf = unfolding
         self.satf = None
         self.z3 = None
+        self.k = -1
         self.__co = None
 
         self.__compute_co_relation ()
@@ -55,6 +57,19 @@ class EquivalenceEncoding :
             assert (self.unf.events[i].nr == i)
         for i in range (len (self.unf.conds)) :
             assert (self.unf.conds[i].nr == i)
+
+    def stats (self) :
+        # nr of events, conditions, labels
+        # int variables, constraints
+        d = {}
+        d['unf.events']        = len (self.unf.events)
+        d['unf.conditions']    = len (self.unf.conds)
+        d['labels.events']     = len (self.unf.net.trans)
+        d['labels.conditions'] = len (self.unf.net.places)
+        d['k']                 = self.k
+        if self.z3 :
+            d['z3.constaints'] = len (self.z3.assertions())
+        return d        
 
     def __ord_pair (self, x, y) :
         if x.nr < y.nr :
@@ -120,6 +135,7 @@ class EquivalenceEncoding :
 
     def sat_encode (self, k) :
         self.satf = cnf.Cnf ()
+        self.k = k
 
         # EQ : it is an equivalence relation
         self.__sat_encode_transitivity ()
@@ -280,6 +296,7 @@ class EquivalenceEncoding :
     def smt_encode (self, k) :
 
         # assert that the unfolding is in right shape and create the solver
+        self.k = k
         self.__smt_assert_repr ()
         self.z3 = z3.Solver ()
 
@@ -287,7 +304,6 @@ class EquivalenceEncoding :
 
         # IP : it preserves independence
         self.__smt_encode_labels ()
-        return
         self.__smt_encode_pre_post ()
         self.__smt_encode_co ()
 
@@ -296,6 +312,7 @@ class EquivalenceEncoding :
 
         # MET : the measure of the folded net is at most k
         self.__smt_encode_measure (k)
+        return
 
     def __smt_encode_labels (self) :
         for i in range (len (self.unf.events)) :
@@ -312,7 +329,9 @@ class EquivalenceEncoding :
             for j in range (i + 1, len (self.unf.events)) :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
+                #print "podisc: smt: pre_post: ei", repr (ei), "ej", repr (ej)
                 if ei.label != ej.label : continue # optimization
+                #print "podisc: smt: pre_post: after!"
 
                 xi = self.__smt_varmap (ei)
                 xj = self.__smt_varmap (ej)
@@ -347,7 +366,8 @@ class EquivalenceEncoding :
         # for each event e, x_e must be smaller or equal to k
         for e in self.unf.events :
             x = self.__smt_varmap (e)
-            self.z3.add (x <= k)
+            self.z3.add (x < k)
+            self.z3.add (0 <= x)
 
     def __smt_encode_subset (self, setx, sety, b = None) :
         # each element of setx must be merged to some element of sety
@@ -589,15 +609,37 @@ def test10 () :
     f = open ('benchmarks/nets/small/ab_gesc.cuf', 'r')
     u = ptnet.unfolding.Unfolding (True)
     u.read (f)
+    print 'prunning'
     u.prune_by_depth (2)
-    u.write (sys.stdout, 'dot')
+    #u.write (sys.stdout, 'dot')
 
     enc = EquivalenceEncoding (u)
-    print
-    enc.smt_encode (1)
-    print
-    #f = open ('/tmp/out.cnf', 'w')
-    print enc.z3
+    print 'building encoding'
+    enc.smt_encode (16)
+    print 'xxxxxxxxxxxxxxxxxxxxxxxxxx'
+    for cons in enc.z3.assertions () : print cons
+    #print enc.z3.to_smt2 ()
+    print 'xxxxxxxxxxxxxxxxxxxxxxxxxx'
+
+    print_stats (sys.stdout, enc.stats ())
+    print 'solving'
+    enc.z3.set ("timeout", 1000 * 60)
+    r = enc.z3.check ()
+    print 'result:', r
+    if r == z3.sat :
+        m = enc.z3.model ()
+        print 'model:', m
+
+
+def print_stats (f, d) :
+    n = max ([len (k) for k in d])
+    l = list (d)
+    l.sort ()
+    for k in l :
+        output (f, k, d[k], n)
+
+def output (f, k, v, n, fmt='%s') :
+    f.write (('%-*s : ' + fmt + '\n') % (n, k, v))
 
 def main () :
     # parse arguments

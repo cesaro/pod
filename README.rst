@@ -1,6 +1,12 @@
 hello world
 
-SMT Encoding
+SAT encoding
+------------
+
+See the paper.
+
+
+SMT Encoding 1: same as the SAT encoding
 ------------
 
 - associate every event e and condition b with an integer variable
@@ -22,6 +28,9 @@ pre ::
   subset (pre e, pre e') and
   subset (pre e', pre e)
 
+post ::
+  as for pre
+
 co ::
   for every two concurrent conditions b, b'
   x_b != x_b'
@@ -29,4 +38,55 @@ co ::
 bound(k) ::
   for all events e,
   x_e <= k
+
+SMT Encoding 2: using labels
+--------------------------
+
+- associate every event e with an integer variable x_e
+- associate every condition b with an integer variable x_b
+- associate every label a with an integer variable x_a
+
+let h : E -> A be the labelling of events with actions
+let h': A -> 2^E be the inverse function
+
+subset (X, Y, v) ::
+  v => AND_{x in X} ( OR_{y in Y} (x_x = x_y ) )
+
+equivalence ::
+  nothing to do :)
+
+labelling ::
+  nothing to do :) !!!
+
+pre ::
+  for every two events with different label
+  (x_e == x_e') implies
+  subset (pre e, pre e', true) and
+  subset (pre e', pre e, true)
+
+post ::
+  analogous to pre
+
+co ::
+  for every two concurrent conditions b, b'
+  if there exists some label a such that
+    (
+      h' (a) \cap post(b) != empty
+      and
+      h' (a) \cap post(b') != empty)
+    )
+    or
+    (
+      h' (a) \cap pre(b) != empty
+      and
+      h' (a) \cap pre(b') != empty)
+    )
+  then add the constraint:
+  x_b != x_b'
+
+bound(k) ::
+  x_{a1} + ... x_{an} <= k
+  and
+  for every label a and every event e in h'(a) :
+  0 <= x_e < x_a
 
