@@ -346,6 +346,33 @@ class SatSolver :
             p.wait ()
             raise
 
+# class SatResult:
+#     SAT = 0
+#     UNSAT = 1
+#     UNKNOWN = 2
+# 
+#     def __init__(self, r):
+#         assert (r in [SatResult.SAT, SatResult.UNSAT, SatResult.UNDEF])
+#         self.r = r
+# 
+#     def __eq__(self, other):
+#         return isinstance (other, SatResult) and self.r == other.r
+# 
+#     def __ne__(self, other):
+#         return not self.__eq__(other)
+# 
+#     def __repr__(self):
+#         if self.r == SatResult.SAT :
+#             return "SAT"
+#         elif self.r == SatResult.UNSAT :
+#             return "UNSAT"
+#         else :
+#             return "UNKNOWN"
+# 
+# SAT     = SatResult (SatResult.SAT)
+# UNSAT   = SatResult (SatResult.UNSAT)
+# UNKNOWN = SatResult (SatResult.UNKNOWN) 
+
 class SatModel :
 
     # outcome of the solving
@@ -372,7 +399,7 @@ class SatModel :
 
     def __getitem__ (self, obj) :
         if self.result != SatModel.RESULT_SAT :
-            raise Exception, "The formula is unsatisfiable"
+            raise Exception, "The formula is not SAT"
         try :
             v = self.phi.varmap[obj];
         except KeyError :

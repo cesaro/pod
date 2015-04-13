@@ -30,17 +30,179 @@ finally :
 def sgl (s) :
     return (list (s))[0]
 
+class Podisc :
+    def __init__ (self) :
+        pass
+    def main (self, args) :
+        pass
+
+    def __assert_merge_pre (self, unf, me) :
+
+        # has a bottom event
+        # it is the unflding in the me
+        assert (len (unf.events[0].pre) == 0)
+        assert (unf == me.enc.unf)
+
+        # inverse labelling is good
+        m = unf.new_mark ()
+        for a in unf.net.trans :
+            assert (len (a.inverse_label) >= 1)
+            for e in a.inverse_label :
+                assert (e.m != m)
+                e.m = m
+        for e in unf.events :
+            assert (e.m == m)
+
+    def __assert_merge_post (self, unf, me, e2t, c2p) :
+
+        assert (len (e2t) == len (unf.events))
+        assert (len (c2p) == len (unf.conds))
+
+        for e,t in e2t.items () :
+            for ee in e2t :
+                if e2t[ee] == t :
+                    assert (me.are_merged (e, ee))
+                    self.__assert_merge_subset (me, e, ee)
+                    self.__assert_merge_subset (me, ee, e)
+        for c,p in c2p.items () :
+            for cc in c2p :
+                if c2p[cc] == p :
+                    assert (me.are_merged (c, cc))
+    
+    def __assert_merge_subset (self, me, e, ee) :
+        # all events in preset and postset of e are merged with at least
+        # one of ee
+        for x,y in [(e.pre, ee.pre), (e.post, ee.post)] :
+            for c in x :
+                assert (reduce (lambda a, b : a or b, \
+                        map (lambda cc : me.are_merged (c, cc), y)))
+
+    def merge (self, unf, me) :
+        self.__assert_merge_pre (unf, me)
+        net = ptnet.net.Net (True)
+
+        # merge events
+        e2t = {}
+        c2p = {}
+        for a in unf.net.trans :
+            d = {}
+            for e in a.inverse_label :
+                found = False
+                for ee in d :
+                    if me.are_merged (e, ee) :
+                        d[ee].add (e)
+                        found = True
+                        break
+                if not found :
+                    d[e] = set ([e])
+            print "podisc: merging: label", repr (a), "result:", d.values ()
+            for e,evs in d.items () :
+                t = net.trans_add (repr ((a, evs)))
+                for ee in evs : e2t[ee] = t
+
+        # merge transitions
+        d = {}
+        for c in unf.conds :
+            found = False
+            for cc in d :
+                if me.are_merged (c, cc) :
+                    d[cc].add (c)
+                    found = True
+                    break
+            if not found :
+                d[c] = set ([c])
+        print "podisc: merging: conditions:", d.values ()
+        for c,conds in d.items () :
+            p = net.place_add (repr (conds))
+            for c in conds : c2p[c] = p
+
+        self.__assert_merge_post (unf, me, e2t, c2p)
+
+        # build flow
+        for e in e2t :
+            for c in e.pre :
+                e2t[e].pre_add (c2p[c])
+            for c in e.post :
+                e2t[e].post_add (c2p[c])
+
+        # build initial marking
+        for c in unf.events[0].post :
+            net.m0[c2p[c]] = 1
+
+        return net
+
+class MergingEquivalence :
+    def are_merged (self, x, y) :
+        return False
+
+class Smt2MergingEquivalence (MergingEquivalence) :
+    def __init__ (self, enc) :
+        self.enc = enc
+        self.model = enc.z3.model ()
+
+    def are_merged (self, x, y) :
+        if isinstance (x, ptnet.unfolding.Condition) :
+            assert (isinstance (y, ptnet.unfolding.Condition))
+
+            vx = self.enc.smt_varmap (x)
+            vy = self.enc.smt_varmap (y)
+
+            # if we didn't generate variable for one of them
+            # then it is surely possible to have one that
+            # has the same value as the other, ie, we merge
+            if (vx == None or vy == None) : return True
+
+            return self.model[vx].as_long () == self.model[vy].as_long ()
+
+        else :
+            assert (isinstance (x, ptnet.unfolding.Event))
+            assert (isinstance (y, ptnet.unfolding.Event))
+
+            if x.label != y.label : return False
+            vx = self.enc.smt_varmap (x)
+            vy = self.enc.smt_varmap (y)
+            assert (vx != None)
+            assert (vy != None)
+            return self.model[vx].as_long () == self.model[vy].as_long ()
+
+    def __str__ (self) :
+        return str (self.model)
+
 class EquivalenceSolver :
-    def __init__ (self, unfolding) :
+    def __init__ (self, unfolding, smt_or_sat = 'SMT_2') :
+        assert (smt_or_sat in ['SMT_1', 'SMT_2', 'SAT'])
         self.unf = unfolding
-        self.satenc = Equivalence_encoding (unfolding)
+        self.enc = EquivalenceEncoding (unfolding)
+        self.smt_or_sat = smt_or_sat
 
     def find_best (self) :
+        # does the binary search
         pass
 
-    def find_with_measure (self, k) :
-        pass
-
+    def find_with_measure (self, k, timeout = 10 * 1000) :
+        # returns an equivalence, or None
+        
+        if self.smt_or_sat == 'SMT_2' :
+            print "podisc: solver: building SMT_2 encoding"
+            self.enc.smt_encode_2 (k)
+            print "podisc: solver: z3: calling, timeout=%ds ..." % (timeout / 1000)
+            self.enc.z3.set ("timeout", timeout)
+            tstart = time.time ()
+            result = self.enc.z3.check ()
+            tend = time.time ()
+            print "podisc: solver: z3: done, %.2fs, %s" % (tend - tstart, result)
+            print_stats (sys.stdout, self.enc.stats (), "podisc: solver: z3: ")
+            if result == z3.sat :
+                return Smt2MergingEquivalence (self.enc)
+            elif result == z3.unsat :
+                return None
+            else :
+                print "podisc: solver: answer: unknown"
+                return None
+        elif smt_or_sat == 'SMT_1' :
+            return None # fixme
+        else :
+            return None # fixme
 
 class EquivalenceEncoding :
     def __init__ (self, unfolding) :
@@ -96,7 +258,10 @@ class EquivalenceEncoding :
 
         if self.z3 :
             d['z3.constaints'] = len (self.z3.assertions())
-        return d        
+        if self.satf :
+            d['sat.clauses'] = len (self.satf.clsset)
+            d['sat.vars']    = len (self.satf.varmap)
+        return d
 
     def __ord_pair (self, x, y) :
         if x.nr < y.nr :
@@ -354,8 +519,8 @@ class EquivalenceEncoding :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
                 if ei.label != ej.label :
-                    x_ei = self.__smt_varmap (ei)
-                    x_ej = self.__smt_varmap (ej)
+                    x_ei = self.smt_varmap (ei)
+                    x_ej = self.smt_varmap (ej)
                     self.z3.add (x_ei != x_ej)
 
     def __smt_encode_pre_post (self, which = "pre_and_post") :
@@ -367,8 +532,8 @@ class EquivalenceEncoding :
                 if ei.label != ej.label : continue # important optimization
                 #print "podisc: smt: pre_post: after!"
 
-                xi = self.__smt_varmap (ei)
-                xj = self.__smt_varmap (ej)
+                xi = self.smt_varmap (ei)
+                xj = self.smt_varmap (ej)
 
                 s = "merge-%s-%s-%s" % (which, repr (ei), repr (ej))
                 b = z3.Bool (s)
@@ -387,8 +552,8 @@ class EquivalenceEncoding :
         for (c1, c2) in self.__co :
             assert ((c1, c2) == self.__ord_pair (c1, c2))
 
-            x1 = self.__smt_varmap (c1)
-            x2 = self.__smt_varmap (c2)
+            x1 = self.smt_varmap (c1)
+            x2 = self.smt_varmap (c2)
 
             #print "podisc: sat: encode_co:", repr (c1), repr (c2)
             self.z3.add (x1 != x2)
@@ -399,7 +564,7 @@ class EquivalenceEncoding :
     def __smt_encode_measure_1 (self, k) :
         # for each event e, x_e must be smaller or equal to k
         for e in self.unf.events :
-            x = self.__smt_varmap (e)
+            x = self.smt_varmap (e)
             self.z3.add (x < k)
             self.z3.add (0 <= x)
 
@@ -409,8 +574,8 @@ class EquivalenceEncoding :
         # true, then subset inclusion happens
         l = []
         for x in setx :
-            vx = self.__smt_varmap (x)
-            cons = z3.Or ([vx == self.__smt_varmap (y) for y in sety])
+            vx = self.smt_varmap (x)
+            cons = z3.Or ([vx == self.smt_varmap (y) for y in sety])
             l.append (cons)
         if b == None :
             s = "merge-subset-%s-%s" % (repr (setx), repr (sety))
@@ -418,7 +583,7 @@ class EquivalenceEncoding :
         self.z3.add (z3.Implies (b, z3.And (l)))
         return b
 
-    def __smt_varmap (self, item) :
+    def smt_varmap (self, item) :
         return z3.Int (repr (item))
 
     def smt_encode_2 (self, k) :
@@ -431,14 +596,18 @@ class EquivalenceEncoding :
         # equivalence: nothing to do !!
 
         # IP : it preserves independence
+        print "podisc: smt_2: presets + posets"
         self.__smt_encode_pre_post ()
+        print "podisc: smt_2: co"
         self.__smt_encode_co_2 ()
 
         # RA: does not merge removed events
         #self.__smt_encode_removal_2 ()
 
         # MET : the measure of the folded net is at most k
+        print "podisc: smt_2: measure"
         self.__smt_encode_measure_2 (k)
+        print "podisc: smt_2: done"
         return
 
     def __smt_encode_co_2 (self) :
@@ -451,24 +620,17 @@ class EquivalenceEncoding :
                 continue
 
             #print "podisc: smt_2: co: needed", repr (c1), repr (c2)
-            x1 = self.__smt_varmap (c1)
-            x2 = self.__smt_varmap (c2)
+            x1 = self.smt_varmap (c1)
+            x2 = self.smt_varmap (c2)
 
             #print "podisc: sat: encode_co:", repr (c1), repr (c2)
             self.z3.add (x1 != x2)
 
     def __smt_encode_co_2_need_to (self, c1, c2) :
-        #m1 = self.unf.new_mark ()
-        #m2 = self.unf.new_mark ()
-        #for e in c1.post :
-        #    e.label.m = m1
-        #for e in c2.post :
-        #    if e.label == m1 : return True
-        #for e in c2.post :
-        #    e.label = m2
-        #for e in c1.post :
-        #    if e.label == m2 : return True
 
+        return True
+
+        # FIXME this is unsound
         if len (set (e.label for e in c1.post) & set (e.label for e in c2.post)) :
             return True
         if len (set (e.label for e in c1.pre) & set (e.label for e in c2.pre)) :
@@ -477,13 +639,13 @@ class EquivalenceEncoding :
 
     def __smt_encode_measure_2 (self, k) :
         # the number of merged transitions in each label must be under k
-        self.z3.add (sum (self.__smt_varmap (t) for t in self.unf.net.trans) <= k)
+        self.z3.add (sum (self.smt_varmap (t) for t in self.unf.net.trans) <= k)
 
         # for each label, and each event e in h' (a)
         for t in self.unf.net.trans :
-            y = self.__smt_varmap (t)
+            y = self.smt_varmap (t)
             for e in t.inverse_label :
-                x = self.__smt_varmap (e)
+                x = self.smt_varmap (e)
                 self.z3.add (z3.And (0 <= x, x < y))
 
 def test1 () :
@@ -665,8 +827,7 @@ def test7 () :
             print s
 
 def test8 () :
-    import z3
-
+    
     x = z3.Int ('x')
     y = z3.Int ('y')
     s = z3.Solver ()
@@ -702,15 +863,18 @@ def test8 () :
     if c == z3.sat :
         m = s.model ()
         print 'model:', m
-    return
 
-    print 'type model', type (m)
-    print m[0]
-    print 'type 0', type (m[0])
-    print 'type constrain', type (y > 1023)
-    print 'm[x]', type (m[x].as_long ())
-    print 'm[x]', type (m[x].as_string ())
-    print 'type m[x]', type (m[x])
+        print m[0]
+        print 'type 0', type (m[0])
+        print 'type constrain', type (y > 1023)
+        print 'type m[x]', type (m[x])
+        print 'type m[x].as_long', type (m[x].as_long ())
+        print 'type m[x].as_string', type (m[x].as_string ())
+
+        print 'value m[y].as_long', m[y].as_long ()
+
+        n = z3.Int ('new_var')
+        print m[n]
 
 def test9 () :
     import z3
@@ -740,7 +904,7 @@ def test10 () :
     u = ptnet.unfolding.Unfolding (True)
     u.read (f)
     print 'prunning'
-    u.prune_by_depth (15)
+    u.prune_by_depth (1)
     #u.write (sys.stdout, 'dot')
 
     enc = EquivalenceEncoding (u)
@@ -768,16 +932,36 @@ def test10 () :
     print 'z3 satistics'
     print enc.z3.statistics ()
 
+def test11 () :
+    f = open ('benchmarks/nets/small/ab_gesc.cuf', 'r')
+    u = ptnet.unfolding.Unfolding (True)
+    u.read (f)
+    print 'prunning'
+    u.prune_by_depth (1)
+    u.add_bottom ()
+    #u.write (sys.stdout, 'dot')
+    print  u.events
 
-def print_stats (f, d) :
+    solver = EquivalenceSolver (u)
+    print 'building encoding'
+    me = solver.find_with_measure (11)
+    if me != None :
+        print 'merging, me', me
+        po = Podisc ()
+        net = po.merge (u, me)
+        net.write (sys.stdout, 'dot')
+    else :
+        print 'merging: no!!!'
+
+def print_stats (f, d, prefix='podisc: ') :
     n = max ([len (k) for k in d])
     l = list (d)
     l.sort ()
     for k in l :
-        output (f, k, d[k], n)
+        output (f, k, d[k], n, prefix)
 
-def output (f, k, v, n, fmt='%s') :
-    f.write (('%-*s : ' + fmt + '\n') % (n, k, v))
+def output (f, k, v, n, prefix='', fmt='%s') :
+    f.write (prefix + ('%-*s : ' + fmt + '\n') % (n, k, v))
 
 def main () :
     # parse arguments
@@ -785,13 +969,13 @@ def main () :
 
     # TODO
     # x support for reading the model
-    # - and building a Merge_equivalence
+    # x and building a Merge_equivalence
     # - support for merging the unfolding given a Merge_equivalence
     # - debug on some small example, start with gas_station.cuf, depth=2,3,4
 
     pass
 
 if __name__ == '__main__' :
-    test7 ()
+    test11 ()
 
 # vi:ts=4:sw=4:et:

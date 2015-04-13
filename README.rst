@@ -23,7 +23,7 @@ labelling ::
   x_e != x_e'
 
 pre ::
-  for every two events (with different label!)
+  for every two events (with equal label!)
   (x_e == x_e') implies
   subset (pre e, pre e') and
   subset (pre e', pre e)
@@ -59,7 +59,7 @@ labelling ::
   nothing to do :) !!!
 
 pre ::
-  for every two events with different label
+  for every two events with equal label:
   (x_e == x_e') implies
   subset (pre e, pre e', true) and
   subset (pre e', pre e, true)
@@ -96,3 +96,4 @@ TODO
  - use (distinct x y) on preset and postset of every event
  - better encoding for the counting on each label, with bit vectors??
  - switch to old encoding for conditions: v_b1,b2, if some number is small ??
+ - generate \bot event when going from the partial orders to the event structure
