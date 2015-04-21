@@ -241,6 +241,17 @@ class Unfolding (net.Net) :
         for c in self.conds :
             c.label.inverse_label.add (c)
 
+    def add_bottom (self) :
+        t = self.net.trans_add ("Bottom")
+        e0 = Event (0, t, post=set([c for c in self.conds if len (c.pre) == 0]))
+        t.inverse_label = set([e0])
+        self.events.append (e0)
+        if len (self.events) >= 2 :
+            self.events[-1] = self.events[0]
+        self.events[0] = e0
+        self.events[-1].nr = len (self.events) - 1
+        return e0
+
     def run_of (self, conf) :
         # TODO: implement the topological sort by hand
         g = self.asym_graph (True, conf, True)
