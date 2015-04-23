@@ -3,12 +3,13 @@ import os
 import sys
 import time
 import math
+
 import ptnet
-import cnf
+import sat
 import z3
 
-import util
-import merging
+from util import *
+from merging import *
 
 def test1 () :
     n = ptnet.net.Net (True)
@@ -61,11 +62,10 @@ def test4 () :
     f = open ('benchmarks/nets/small/ab_gesc.cuf', 'r')
     u = ptnet.unfolding.Unfolding (True)
     u.read (f)
-    u.prune_by_depth (8)
+    u.prune_by_depth (2)
     u.write (sys.stdout, 'dot')
-    return
 
-    finder = Equivalence_finder (u)
+    finder = merging.EquivalenceEncoding (u)
     print
     finder.sat_encode (1)
     print
@@ -82,10 +82,10 @@ def test5 () :
         u.write (ff, 'dot')
 
 def test6 () :
-    phi = cnf.Cnf ()
+    phi = sat.Cnf ()
 
-    a = cnf.Integer (phi, "first", 4)
-    b = cnf.Integer (phi, "second", 4)
+    a = sat.Integer (phi, "first", 4)
+    b = sat.Integer (phi, "second", 4)
     v = a.encode_lt (b)
     print 'returned', v
 
@@ -95,7 +95,7 @@ def test6 () :
     a.encode_eq_constant (5)
     b.encode_eq_constant (4)
 
-    solver = cnf.SatSolver ()
+    solver = sat.SatSolver ()
 
     model = solver.solve (phi)
     print 'SAT  ', model.is_sat ()
@@ -143,7 +143,7 @@ def test7 () :
 
                 stat_nvars = len (enc.satf.varmap)
                 stat_nclss = len (enc.satf.clsset)
-                solver = cnf.SatSolver ()
+                solver = sat.SatSolver ()
 
                 tstart = time.time ()
                 model = solver.solve (enc.satf, 60)
