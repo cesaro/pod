@@ -9,6 +9,7 @@ import sat
 import z3
 
 from util import *
+from log import *
 from merging import *
 
 def test1 () :
@@ -314,5 +315,15 @@ def test11 () :
         net.write (sys.stdout, 'dot')
     else :
         print 'merging: no!!!'
+
+def test12 () :
+    print log_from_xes ('benchmarks/logs/a22f0n00_1.xes', all_info=True,only_uniq_cases=False)
+    print log_from_xes ('benchmarks/logs/a22f0n00_1.xes')
+
+def test13 () :
+    l = Log ()
+    f = open ('benchmarks/logs/a22f0n00_1.xes')
+    #f = open ('benchmarks/logs/incidenttelco.anon.xes')
+    l.read (f, 'xes')
 
 # vi:ts=4:sw=4:et:

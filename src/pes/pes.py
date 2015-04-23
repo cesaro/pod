@@ -15,8 +15,12 @@ class Event :
     def pre_add (self, e) :
         # like for unfoldings
         pass
+
     def post_add (self, e) :
         # like for unfoldings
+        pass
+
+    def cfl_add (self, e) :
         pass
 
     def __repr__ (self) :
@@ -33,8 +37,10 @@ class PES :
         self.events = []
         self.m = 0
 
-    def add_event (self, label=None) :
+    def add_event (self, label=None, pre=set(), cfl=set()) :
         e = Event (label)
+        for ep in pre : e.pre_add (ep)
+        for ep in cfl : e.cfl_add (ep)
         self.events.append (e)
         return e
 
@@ -122,3 +128,5 @@ class Configuration :
     def __str__ (self) :
         # FIXME add enabled
         return repr (self.events)
+
+# vi:ts=4:sw=4:et:
