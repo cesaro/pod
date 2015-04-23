@@ -63,9 +63,8 @@ def test4 () :
     u.read (f)
     u.prune_by_depth (8)
     u.write (sys.stdout, 'dot')
-    return
 
-    finder = Equivalence_finder (u)
+    finder = merging.EquivalenceEncoding (u)
     print
     finder.sat_encode (1)
     print

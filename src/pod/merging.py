@@ -1,4 +1,6 @@
 
+import cnf
+
 def sgl (s) :
     return (list (s))[0]
 
