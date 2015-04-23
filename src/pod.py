@@ -3,7 +3,7 @@
 if __name__ == '__main__' :
     import sys
     import pod
-    pod.test.test4 ()
+    pod.test.test7 ()
     sys.exit (0)
 
     try :

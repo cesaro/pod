@@ -1,5 +1,12 @@
 
-import cnf
+import math
+import time
+
+import sat
+import ptnet
+import z3
+
+from util import *
 
 def sgl (s) :
     return (list (s))[0]
@@ -200,7 +207,7 @@ class EquivalenceEncoding :
         #print "podisc: compute_co:  total", len (l)
 
     def sat_encode (self, k) :
-        self.satf = cnf.Cnf ()
+        self.satf = sat.Cnf ()
         self.k = k
 
         # EQ : it is an equivalence relation
@@ -325,7 +332,7 @@ class EquivalenceEncoding :
         bitwith = int (math.ceil (math.log (1 + len (self.unf.events), 2)))
         intmap = {}
         for e in self.unf.events :
-            intmap[e] = cnf.Integer (self.satf, e, bitwith)
+            intmap[e] = sat.Integer (self.satf, e, bitwith)
         
         # for every two events, if they are merged, the integers must equal
         for i in range (len (self.unf.events)) :
@@ -337,7 +344,7 @@ class EquivalenceEncoding :
                 intmap[ei].encode_eq (intmap[ej], vij)
 
         # we generate one more integer for the bound
-        bound = cnf.Integer (self.satf, "bound (k+1)", bitwith)
+        bound = sat.Integer (self.satf, "bound (k+1)", bitwith)
         bound.encode_eq_constant (k + 1)
 
         # the integer associated to any event must be smaller than the bound

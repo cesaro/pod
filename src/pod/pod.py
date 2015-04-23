@@ -1,18 +1,15 @@
 
 try :
-    import util
     import os
     import sys
-    import time
-    import math
     import resource
-    import argparse
-    import ptnet
-    import cnf
-    import z3
 
+    import util
     import merging
     import log
+
+    import ptnet
+    import z3
 except ImportError, e:
     util.error_missing_package (e)
 
@@ -127,7 +124,7 @@ class Pod :
         return net
 
 def main () :
-    # parse arguments
+    # parse arguments (import argparse)
     # assert that input net is 1-safe!!
 
     # TODO

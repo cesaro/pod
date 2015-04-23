@@ -15,4 +15,8 @@ def error_missing_package (exception) :
     print 'This tool requires, among others, argparse, and networkx'
     print 'The runtime reported the following error:\n\n', str (exception), '\n'
     print 'You might want to use "easy_install --user PACKAGE"'
-    raise exception
+    print ''
+    import sys
+    sys.exit (1)
+
+# vi:ts=4:sw=4:et:
