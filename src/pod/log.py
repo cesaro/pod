@@ -81,7 +81,7 @@ class Log :
                 max_events = c.find_h0 (a, indep)
                 e = pes.add_event (a, max_events)
                 pes.set_cfls (e, indep)
-                c.update_enabled (e)
+                c.update_enabled_hint (e)
             c.add (e)
 
 

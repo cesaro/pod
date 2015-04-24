@@ -5,6 +5,7 @@ import time
 import math
 
 import ptnet
+import pes
 import sat
 import z3
 
@@ -322,8 +323,36 @@ def test12 () :
 
 def test13 () :
     l = Log ()
-    f = open ('benchmarks/logs/a22f0n00_1.xes')
-    #f = open ('benchmarks/logs/incidenttelco.anon.xes')
+    #f = open ('benchmarks/logs/a22f0n00_1.xes')
+    f = open ('benchmarks/logs/incidenttelco.anon.xes')
     l.read (f, 'xes')
+
+def test14 () :
+    p = pes.PES ()
+    a = p.add_event ("a")
+    b = p.add_event ("b")
+    c = p.add_event ("c")
+    d = p.add_event ("d")
+    c.pre_add (a)
+    c.pre_add (b)
+    c.cfl_add (d)
+    p.update_minimal ()
+
+    print 'all events', a, b, c, d
+    print 'structure', p
+
+    con = p.get_empty_config ()
+    print 'config', con
+    print 'enabled', con.enabled ()
+    con.add (a)
+    print 'after adding a', con
+    con.add (b)
+    print 'after adding b', con
+    con.add (d)
+    print 'after adding d', con
+    #con.add (c) # exception expected
+    #print 'after adding c', con
+
+    p.write (sys.stdout, 'dot')
 
 # vi:ts=4:sw=4:et:

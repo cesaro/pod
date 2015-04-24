@@ -2,68 +2,136 @@
 import sys
 
 class Event :
-    next_nr = 0
-    def __init__ (self, label) :
+    def __init__ (self, nr, label) :
         self.pre = set ()
         self.post = set ()
         self.cfl = set ()
         self.label = label
         self.nr = nr
         self.m = 0
-        nr += 1
     
     def pre_add (self, e) :
-        # like for unfoldings
-        pass
+        if e in self.pre : return
+        self.pre.add (e)
+        e.post_add (self)
 
     def post_add (self, e) :
-        # like for unfoldings
-        pass
+        if e in self.post : return
+        self.post.add (e)
+        e.pre_add (self)
 
     def cfl_add (self, e) :
-        pass
+        if e in self.cfl : return
+        self.cfl.add (e)
+        e.cfl_add (self)
 
     def __repr__ (self) :
-        return "%d:%s" % (self.nr, repr (self.label))
+        return "e%d:%s" % (self.nr, repr (self.label))
 
     def __str__ (self) :
-        s = "%d:%s " % (self.nr, repr (self.label))
-        s += "pre" + " ".join (self.pre)
-        s += "cfl" + " ".join (self.cfl)
+        s = "e%d:%s" % (self.nr, repr (self.label))
+        s += " pre " + str (list (self.pre))
+        s += " cfl " + str (list (self.cfl)) + ";"
         return s
 
 class PES :
     def __init__ (self) :
         self.events = []
         self.m = 0
+        self.minimal = set ()
 
     def add_event (self, label=None, pre=set(), cfl=set()) :
-        e = Event (label)
+        e = Event (len (self.events), label)
         for ep in pre : e.pre_add (ep)
         for ep in cfl : e.cfl_add (ep)
         self.events.append (e)
         return e
+
+    def update_minimal (self) :
+        self.minimal = set ()
+        for e in self.events :
+            if len (e.pre) == 0 :
+                self.minimal.add (e)
+
+    def update_minimal_hint (self, e) :
+        if len (e.pre) == 0 :
+            self.minimal.add (e)
 
     def new_mark (self) :
         self.m += 1
         return self.m
 
     def get_empty_config (self) :
-        # returns an empty configuration
-        pass
+        return Configuration (self)
 
     def mark_local_config (self, events, m) :
-        # mark the local configurations of these guys
-        pass
+        work = events
+        while len (work) :
+            e = work.pop ()
+            e.m = m
+            for ep in e.pre :
+                if ep.m != m : work.append (ep)
 
     def set_cfls (self, e, indep) :
-        # set conflicts by a linear scan of the structure, avoiding the local
-        # config
-        pass
+
+        if len (e.post) :
+            raise Exception, "Trying to compute conflicts for non maximal event %s" % repr (e)
+
+        # mark in red local configuration
+        # mark in blue all immediate conflicts of those in local config
+        mred = self.new_mark ()
+        mblue = self.new_mark ()
+        mgreen = self.new_mark ()
+        work = [e]
+        while len (work) :
+            ep = work.pop ()
+            ep.m = mred
+            for epp in ep.pre :
+                if epp.m != mred : work.append (epp)
+            for epp in ep.cfl :
+                epp.m = mblue
+
+        # for remaining events, process them once their local config is
+        # processed, color them in green
+        work = list (self.minimal)
+        while len (work) :
+            ep = work.pop ()
+            assert (ep.m != mgreen)
+            if ep.m == mblue : continue
+            if ep.m != mred :
+                if not indep[e.label][ep.label] :
+                    e.cfl_add (ep)
+                    continue
+                ep.m = mgreen
+            for e2 in ep.post :
+                # if every event in e2's preset is green or red, e2 is ready
+                found = False
+                for e3 in e2.pre :
+                    if e3 != mred and e3 != mgreen :
+                        found = True
+                        break
+                if not found :
+                    work.append (e2)
 
     def write (self, f, fmt='dot') :
         if fmt == 'dot' : return self.__write_dot (f)
         raise Exception, "'%s': unknown output format" % fmt
+
+    def __write_dot (self, f) :
+        f.write ('digraph {\n')
+        f.write ('\t/* events */\n')
+        f.write ('\tnode\t[shape=box style=filled fillcolor=gray80];\n')
+        for e in self.events :
+            f.write ('\t%s [label="%s"];\n' % (id (e), repr (e)))
+
+        f.write ('\n\t/* causality and conflict */\n')
+        for e in self.events :
+            for ep in e.pre :
+                f.write ('\t%s -> %s;\n' % (id (ep), id (e)))
+            for ep in e.cfl :
+                if id (e) < id (ep) : continue
+                f.write ('\t%s -> %s [style=dashed];\n' % (id (ep), id (e)))
+        f.write ('\n\tgraph [label="%d events"];\n}\n' % len (self.events))
 
     def __repr__ (self) :
         return repr (self.events)
@@ -71,62 +139,96 @@ class PES :
     def __str__ (self) :
         return repr (self.events)
     
-    def normalize_immediate_conflicts (self) :
-        # remove from event.cfl those events in indirect conflict
-        pass
-
 class Configuration :
-    def __init__ (self, pes, events=set()) :
+    #def __init__ (self, pes, events=set()) :
+    def __init__ (self, pes) :
         self.pes = pes
-        self.events = set (events)
-        self.__en = set ()
+        self.events = set ()
+        self.__en = set (pes.minimal)
         self.__max = set ()
 
     def enabled (self) :
-        # returns set of enabled events
-        pass
+        return self.__en
 
     def extensions (self) :
         # returns ex(C)
         pass
 
     def add (self, e) :
-        # adds one enabled event
+        if e not in self.__en :
+            raise ValueError, "Event %s is not enabled cand cannot be added" % repr (e)
 
-        # - verify that e is in __en
-        # - add it to envents
-        # - update enabled
-        pass
+        # add it
+        self.events.add (e)
 
-    def update_enabled (self, e) :
-        # updates __en if this event is enabled (it has been added to the pes)
-        pass
+        # update maximal events
+        self.__max -= e.pre
+        self.__max.add (e)
+
+        # update enabled events; first all those enabled in conflict with
+        # e must go away, as well as e
+        self.__en.remove (e)
+        self.__en -= e.cfl
+
+        # second, we add events enabled by the new addition, all of which
+        # are in e's postset (if their history is in the configuration and
+        # no conflict is in there)
+        for ep in e.post :
+            if self.__is_enabled (ep) :
+                self.__en.add (ep)
+
+    def __is_enabled (self, e) :
+        # computes if an event is enabled, the hard way, e's history shall
+        # be in the configuration and no conflict of it can be
+        return e.pre <= self.events and e.cfl.isdisjoint (self.events)
+
+    def update_enabled_hint (self, e) :
+        # updates __en with this event if it is not in __en (eg, because it
+        # has been added after creating this configuration)
+        if self.__is_enabled (e) :
+            self.__en.add (e)
 
     def find_h0 (self, t, indep) :
         # find the largest history in this configuration for t under indep
         # discarding the hippies (checking if e.post is in what remains)
         # returns set of concurrent (maximal) events
 
-        # keep two lists, move dependent ones to the second
-        pass
+        # keep two lists, move dependent events to dep; mark hippies with m
+        m = self.new_mark ()
+        dep = []
+        work = list (self.__max)
+        while len (work) :
+            e = work.pop ()
+            assert (e.m != m)
+            if not indep[e.label][t] :
+                dep.append (e)
+                continue
+            e.m = m
+            for ep in e.pre :
+                # ep is ready iff ep.post is all marked
+                found = False
+                for epp in ep.post :
+                    if epp.m != m :
+                        found = True
+                        break
+                if not found :
+                    work.append (ep)
+        return dep
 
     def is_ex (self, e) :
         # return whether e is an extension of the configuration
         pass
 
     def is_en (self, e) :
-        # return whether e is in __en
-        pass
-
+        return e in self.__en
 
     def __iter__ (self) :
         iter (events)
 
     def __repr__ (self) :
-        return repr (self.events)
+        return repr (list (self.events))
 
     def __str__ (self) :
-        # FIXME add enabled
-        return repr (self.events)
+        return "conf %s max %s en %s" % (list(self.events), list(self.__max), list(self.__en))
 
 # vi:ts=4:sw=4:et:
