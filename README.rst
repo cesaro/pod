@@ -101,3 +101,25 @@ TODO
    generate (distinct x y) for x,y in its preset
  - most events have a label different than anyone else, ie, cannot be merged
    with any one. Remove them from the encoding!!
+
+Commandline syntax
+==================
+
+
+pod [OPTIONS] dependence-extract PNML
+pod [OPTIONS] dump-log LOGFILE
+pod [OPTIONS] dump-pes LOGFILE INDEPFILE
+pod [OPTIONS] dump-bp LOGFILE INDEPFILE
+pod [OPTIONS] dump-encoding LOGFILE INDEPFILE
+pod [OPTIONS] dump-merge LOGFILE INDEPFILE
+pod [OPTIONS] merge LOGFILE INDEPFILE
+
+
+OPTIONS:
+
+--log-first=n
+--log-only=1,2,4
+--log-exclude=7,23
+--output=PATH
+--format={pdf,dot,pnml}
+

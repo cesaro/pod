@@ -436,7 +436,7 @@ def test18 () :
     # configurations, intersection, get_local_config
     l = Log ()
     l.read ('benchmarks/logs/a22f0n00_1.xes')
-    l.traces = l.traces[0:30]
+    #l.traces = l.traces[0:30]
     print 'log', l
 
     n = ptnet.Net ()
