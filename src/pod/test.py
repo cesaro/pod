@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import math
+import networkx
 
 import ptnet
 import pes
@@ -12,6 +13,7 @@ import z3
 from util import *
 from log import *
 from merging import *
+from pod import *
 
 def test1 () :
     n = ptnet.net.Net (True)
@@ -359,12 +361,12 @@ def test15 () :
     l = Log ()
     #l.read ('benchmarks/logs/incidenttelco.anon.xes')
     l.read ('benchmarks/logs/a22f0n00_1.xes')
-    #l.traces = l.traces[0:60]
+    l.traces = l.traces[0:10]
     print 'log', l
 
     indep = Indep ()
-    es = l.to_pes (indep)
-    es.write ('empty.dot', 'dot')
+    #es = l.to_pes (indep)
+    #es.write ('empty.dot', 'dot')
 
     n = ptnet.Net ()
     n.read ('benchmarks/logs/a22f0n00_1.pnml')
@@ -377,5 +379,82 @@ def test15 () :
     print 'log', l
     print 'es', es
     print 'indep', indep
+
+def test16 () :
+    g = networkx.Graph ()
+    g.add_edge (1, 2)
+    g.add_edge (3, 4)
+    g.add_edge (3, 6)
+    g.add_edge (4, 6)
+    g.add_edge (5, 6)
+    g.add_edge (6, 7)
+    g.add_edge (6, 8)
+    g.add_edge (7, 8)
+    g.add_edge (8, 7)
+
+    print 'edges', g.edges ()
+    print 'maximal cliques', list (networkx.find_cliques (g))
+    # [[1, 2], [6, 8, 7], [6, 3, 4], [6, 5]]
+
+def test17 () :
+    # configurations, intersection, get_local_config
+    l = Log ()
+    l.read ('benchmarks/logs/a22f0n00_1.xes')
+    l.traces = l.traces[0:2]
+    print 'log', l
+
+    n = ptnet.Net ()
+    n.read ('benchmarks/logs/a22f0n00_1.pnml')
+    indep = l.extract_indep_from_net (n)
+    es = l.to_pes (indep)
+    es.write ('full.dot', 'dot')
+
+    print 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+    print 'PES', es
+    e = es.events[3]
+    c1 = es.get_local_config (e)
+    print 'c1', c1
+    e = es.events[17]
+    c2 = es.get_local_config (e)
+    print 'c2', c2
+    c3 = c1.intersect_with (c2)
+    print 'xxxxxxxxxxx after intersection:'
+    print 'c2', c2
+    print 'c1', c1
+    print 'c3', c3
+
+    print 'xxxxxxxxxxxxxxxxxxxxxx'
+    c4 = es.get_config_from_set (es.events[i] for i in [0, 1, 2, 3, 5, 6])
+    print 'c4', c4
+    c5 = es.get_config_from_set (es.events[i] for i in [6, 4])
+    print 'c5', c5
+    c6 = es.get_config_from_set (es.events[i] for i in [0, 1, 2, 17, 6])
+    print 'c6', c6
+
+def test18 () :
+    # configurations, intersection, get_local_config
+    l = Log ()
+    l.read ('benchmarks/logs/a22f0n00_1.xes')
+    #l.traces = l.traces[0:40]
+    print 'log', l
+
+    n = ptnet.Net ()
+    n.read ('benchmarks/logs/a22f0n00_1.pnml')
+    indep = l.extract_indep_from_net (n)
+    es = l.to_pes (indep)
+    es.write ('pes.dot', 'dot')
+
+    pod = Pod ()
+    print 'es (before)', es, 'nr actions', len (l.action_tab)
+    print 'xxxxxxxxxxxxxxx'
+    unf = pod.pes_to_bp (es)
+    print 'yyyyyyyyyyyyyyyyyy'
+    print 'es (after) ', es
+    print 'unf.events', unf.events
+    print 'unf.conds', unf.conds
+    print 'unf.net.trans', unf.net.trans, 'size', len (unf.net.trans)
+    print 'unf.net.places', unf.net.places
+    unf.write ('unf.dot', 'dot')
+
 
 # vi:ts=4:sw=4:et:

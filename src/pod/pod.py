@@ -3,13 +3,15 @@ try :
     import os
     import sys
     import resource
+    import networkx
 
     import util
     import merging
     import log
 
-    import ptnet
     import z3
+    import ptnet
+    import pes
 except ImportError, e:
     util.error_missing_package (e)
 
@@ -71,7 +73,7 @@ class Pod :
 
     def merge (self, unf, me) :
         self.__assert_merge_pre (unf, me)
-        net = ptnet.net.Net (True)
+        net = ptnet.Net (True)
 
         # merge events
         e2t = {}
@@ -122,6 +124,92 @@ class Pod :
             net.m0[c2p[c]] = 1
 
         return net
+
+    def pes_to_bp (self, es) :
+        unf = ptnet.Unfolding ()
+
+        # generate the events of the unfolding
+        ev_tab = self.__pes_to_bp_gen_events (es, unf)
+        print 'ev_tab', ev_tab
+
+        # search for the cliques in the conflict relation and make a table
+        cfl_tab = self.__pes_to_bp_build_conflict_table (es)
+        cfl_tab = self.__pes_to_bp_conflict_table_pick_single (es, cfl_tab)
+        print 'cfl_tab', cfl_tab
+
+        # generate one condition and related causalities for every clique 
+        pre_tab = self.__pes_to_bp_gen_conds_cfl (es, unf, cfl_tab, ev_tab)
+
+        # for every two events in causal relation in the PES, generate
+        # conditions (skiping causalities already introduced before)
+        pre_tab = self.__pes_to_bp_gen_conds_pre (es, unf, ev_tab, pre_tab)
+        return unf
+
+        # we are done!
+        return unf
+
+    def __pes_to_bp_gen_events (self, es, unf) :
+        ev_tab = {}
+        action_set = set ()
+        for e in es.events :
+            action_set.add (e.label)
+            unfe = unf.event_add (e.label)
+            ev_tab[e] = unfe
+
+        # XXX - this is somehow a hack, but it will hopefully work
+        unf.net.trans = list (action_set)
+        return ev_tab
+
+    def __pes_to_bp_build_conflict_table (self, es) :
+        # - create an undirected graph representing the conflicts
+        # - find all maximal cliques
+        # - for each one of them, find the list of maximal events in
+        #   intersection of local configurations of the events in the clique
+        # - build the table
+
+        g = networkx.Graph ()
+        tab = {}
+        for e in es.events :
+            for ep in e.cfl :
+                g.add_edge (e, ep)
+        for clique in networkx.find_cliques (g) :
+            local_configs = [es.get_local_config (e) for e in clique]
+            c = reduce (lambda c1, c2 : c1.intersect_with (c2), local_configs)
+            tup = (tuple (c.maximal ()), tuple (clique))
+            for e in clique :
+                tab[e] = tup
+        return tab
+
+    def __pes_to_bp_conflict_table_pick_single (self, es, cfl_tab) :
+        tab = {}
+        for (maxevs, clique) in cfl_tab.values () :
+            e = maxevs[0] if len (maxevs) else None
+            tup = (e, clique)
+            for e in clique :
+                tab[e] = tup
+        return tab
+
+    def __pes_to_bp_gen_conds_cfl (self, es, unf, cfl_tab, ev_tab) :
+        pre_tab = {}
+        for (epre, clique) in set (cfl_tab.values ()) :
+            pre = [ev_tab[epre]] if epre != None else []
+            post = [ev_tab[e] for e in clique]
+            c = unf.cond_add (None, pre, post)
+            for e in clique :
+                pre_tab[epre, e] = c
+        return pre_tab
+
+    def __pes_to_bp_gen_conds_pre (self, es, unf, ev_tab, pre_tab) :
+        for e in es.events :
+            for ep in e.pre :
+                if (ep, e) not in pre_tab :
+                    c = unf.cond_add (None, [ev_tab[ep]], [ev_tab[e]])
+                    pre_tab[ep, e] = c
+            if len (e.pre) == 0 :
+                if (None, e) not in pre_tab :
+                    c = unf.cond_add (None, [], [ev_tab[e]])
+                    pre_tab[None, e] = c
+        return pre_tab
 
 def main () :
     # parse arguments (import argparse)

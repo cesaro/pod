@@ -74,15 +74,15 @@ class Log :
     def __trace_to_pes (self, es, seq, indep) :
         c = es.get_empty_config ()
         print 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-        print 'pes', es
-        print 'seq', seq
+        #print 'pes', es
+        #print 'seq', seq
         i = 0
         for logev in seq :
             a = logev.action
             l = [e for e in c.enabled () if e.label == a]
             print '-------------------------'
             print 'action', a
-            print 'configuration', c
+            #print 'configuration', c
             print 'l', l
             assert (len (l) == 0 or len (l) == 1)
             if l :

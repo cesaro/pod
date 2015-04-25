@@ -58,6 +58,8 @@ class PES :
     def update_minimal_hint (self, e) :
         if len (e.pre) == 0 :
             self.minimal.add (e)
+        elif e in self.minimal :
+            self.minimal.remove (e)
 
     def new_mark (self) :
         self.m += 1
@@ -65,6 +67,35 @@ class PES :
 
     def get_empty_config (self) :
         return Configuration (self)
+
+    def get_local_config (self, e) :
+        m = self.new_mark ()
+        self.mark_local_config ([e], m)
+        return self.get_config_from_mark (m)
+
+    def get_config_from_mark (self, m) :
+        config = Configuration (self)
+        while True :
+            found = False
+            for e in config.enabled () :
+                if e.m == m :
+                    config.add (e)
+                    found = True
+                    break
+            if not found :
+                return config
+
+    def get_config_from_set (self, events) :
+        # XXX - this function will silently return some configuration
+        # contained in "events" when they are not causally closed or
+        # contain conflicts
+        if not isinstance (events, set) :
+            events = set (events)
+        config = Configuration (self)
+        while True :
+            s = config.enabled () & events
+            if len (s) == 0 : return config
+            config.add (s.pop ())
 
     def mark_local_config (self, events, m) :
         work = events
@@ -164,8 +195,40 @@ class Configuration :
         self.__en = set (pes.minimal)
         self.__max = set ()
 
+    def copy (self, other) :
+        self.pes = other.pes
+        self.events = other.events
+        self.__en = other.__en
+        self.__max = other.__max
+
+    def deep_copy (self, other) :
+        self.pes = other.pes
+        self.events = set (other.events)
+        self.__en = set (other.__en)
+        self.__max = set (other.__max)
+
+    def clone (self) :
+        config = Configuration (self.pes)
+        config.deep_copy (self)
+        return config
+
+    def intersect_with (self, other) :
+        if self.pes != other.pes :
+            raise ValueError, "Intersection between configurations of different PESs"
+        result = Configuration (self.pes)
+        intersection = self.events & other.events
+        while True :
+            s = result.__en & intersection
+            if len (s) == 0 : break
+            result.add (s.pop ())
+        self.copy (result)
+        return self
+
     def enabled (self) :
         return self.__en
+
+    def maximal (self) :
+        return self.__max
 
     def extensions (self) :
         # returns ex(C)
@@ -204,6 +267,8 @@ class Configuration :
         # has been added after creating this configuration)
         if self.__is_enabled (e) :
             self.__en.add (e)
+        elif e in self.__en :
+            self.__en.remove (e)
 
     def find_h0 (self, t, indep) :
         # find the largest history in this configuration for t under indep

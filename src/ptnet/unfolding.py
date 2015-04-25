@@ -22,7 +22,7 @@ def timeit (t = None, msg='') :
     return time.time ()
 
 class Event (net.Transition) :
-    def __init__ (self, nr, label, pre=set(), post=set(), cont=set(),
+    def __init__ (self, nr, label, pre=[], post=[], cont=[],
             white=True, gray=False) :
         net.Transition.__init__ (self, nr)
         self.nr = nr
@@ -45,18 +45,20 @@ class Event (net.Transition) :
         return '%s:%se%d' % (repr (self.label), s, self.nr)
 
 class Condition (net.Place) :
-    def __init__ (self, nr, label, pre=set(), post=set(), cont=set()) :
+    def __init__ (self, nr, label, pre=[], post=[], cont=[]) :
         net.Place.__init__ (self, nr)
         self.nr = nr
         self.label = label
-        self.m0 = 1 if len (pre) == 0 else 0
 
         for e in pre : self.pre_add (e)
         for e in post : self.post_add (e)
         for e in cont : self.cont_add (e)
 
     def __repr__ (self) :
-        return '%s:c%d' % (repr (self.label), self.nr)
+        if self.label != None :
+            return '%s:c%d' % (repr (self.label), self.nr)
+        else :
+            return 'c%d' % self.nr
 
 class Unfolding (net.Net) :
     def __init__ (self, sanity_check=True) :
@@ -67,7 +69,19 @@ class Unfolding (net.Net) :
         self.nr_gray = 0
         self.net = net.Net (sanity_check)
 
-    def remove_cond (self, nr) :
+    def event_add (self, label, pre=[], post=[], cont=[]) :
+        e = Event (len (self.events), label, pre, post, cont)
+        self.events.append (e)
+        return e
+
+    def cond_add (self, label, pre=[], post=[], cont=[]) :
+        c = Condition (len (self.conds), label, pre, post, cont)
+        self.conds.append (c)
+        if len (pre) == 0 :
+            self.m0[c] = 1
+        return c
+
+    def cond_remove (self, nr) :
         c = self.conds[nr]
         self.m0[c] = 0
         if len (c.pre) :
@@ -88,7 +102,7 @@ class Unfolding (net.Net) :
         if len (c.label.inverse_label) == 0 :
             self.net.places.remove (c.label)
 
-    def remove_event (self, nr) :
+    def event_remove (self, nr) :
         e = self.events[nr]
         for c in e.pre :
             c.post.remove (e)
@@ -204,9 +218,7 @@ class Unfolding (net.Net) :
                 idx = self.__cuf2unf_readint (f)
                 self.__check_event_id (idx)
                 cont.add (self.events[idx])
-            c = Condition (len (self.conds), p, pre, post, cont)
-            self.conds.append (c)
-            if c.m0 > 0 : self.m0[c] = c.m0
+            self.cond_add (p, pre, post, cont)
 
         # finally, read transition and place names
         s = f.read ()
@@ -414,7 +426,7 @@ class Unfolding (net.Net) :
 
         # for all initial conditions, make associated mp-conditions initial
         for c in self.m0 :
-            c.mpcond.m0 += c.m0
+            c.mpcond.m0 += self.m0[c]
             mproc.m0.add (c.mpcond)
         t = timeit (t, 'merging conditions (step 1)')
 
