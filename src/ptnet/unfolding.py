@@ -605,49 +605,4 @@ class Unfolding (net.Net) :
                         work.append (ep)
         return cone
 
-def test1 () :
-    f = open ('/tmp/cesar/test.cuf', 'r')
-    f1 = open ('/tmp/cesar/out.dot', 'w')
-    f2 = open ('/tmp/cesar/out-c.dot', 'w')
-    f3 = open ('/tmp/cesar/out-ce.dot', 'w')
-    u = Unfolding (True)
-    u.read (f, fmt='cuf')
-    u.write (f1, 'dot')
-    u.remove_cond (20)
-    u.write (f2, 'dot')
-    u.remove_event (16)
-    u.write (f3, 'dot')
-
-    for x in [f, f1, f2] : x.close ()
-
-def test2 () :
-    f = open ('/tmp/cesar/test.cuf', 'r')
-    f1 = open ('/tmp/cesar/out.dot', 'w')
-
-    u = Unfolding (True)
-    u.read (f, fmt='cuf')
-
-    items = set ([u.events[1]])
-
-    u.write (f1, 'ctxdot', items, 3)
-
-def test3 () :
-    u = Unfolding (True)
-    u.read (sys.stdin, fmt='cuf')
-    #u.write (sys.stdout, fmt='dot')
-    u.write (sys.stdout, fmt='pep')
-    sys.exit (0)
-
-def test4 () :
-    u = Unfolding (True)
-    f = open ('/tmp/depths.unf.cuf', 'r')
-    fout = open ('/tmp/depths.mp.ll_net', 'w')
-    u.read (f, fmt='cuf')
-    mp = u.merge ()
-    mp.write (fout, 'pep')
-    sys.exit (0)
-
-if __name__ == '__main__' :
-    test3 ()
-
 # vi:ts=4:sw=4:et:

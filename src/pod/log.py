@@ -39,6 +39,7 @@ class Log :
             return a
 
     def read (self, f, fmt='xes') :
+        if isinstance (f, basestring) : f = open (f, 'r')
         if fmt == 'xes' : return self.__read_xes (f)
         raise ValueError, "'%s': unknown input format" % fmt
 
@@ -67,31 +68,149 @@ class Log :
     def to_pes (self, indep) :
         es = pes.PES ()
         for seq in self.traces :
-            self.__trace_to_pes (self, pes, seq, indep)
+            self.__trace_to_pes (es, seq, indep)
+        return es
 
-    def __trace_to_pes (self, pes, seq, indep) :
-        c = pes.get_empty_config ()
+    def __trace_to_pes (self, es, seq, indep) :
+        c = es.get_empty_config ()
+        print 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        print 'pes', es
+        print 'seq', seq
+        i = 0
         for logev in seq :
             a = logev.action
             l = [e for e in c.enabled () if e.label == a]
+            print '-------------------------'
+            print 'action', a
+            print 'configuration', c
+            print 'l', l
             assert (len (l) == 0 or len (l) == 1)
             if l :
-                e = c.add (l[0])
+                e = l[0]
             else :
                 max_events = c.find_h0 (a, indep)
-                e = pes.add_event (a, max_events)
-                pes.set_cfls (e, indep)
+                e = es.add_event (a, max_events)
+                es.set_cfls (e, indep)
                 c.update_enabled_hint (e)
+            print 'firing', e
             c.add (e)
+            if i == 0 :
+                es.update_minimal_hint (e)
+                i += 1
 
+    def extract_indep_from_net (self, net) :
+        # XXX - this method assumes that the net contains exactly one
+        # transition whose name equals the action's name, for every action
+        # occurring in the log
+        td = Depen ()
+        td.from_net (net)
+        d = Depen ()
+        for a1 in self.action_tab :
+            for a2 in self.action_tab :
+                # retrieve the *unique* transitions labelled by a1 and a2
+                #print 'a1 a2', a1, a2
+                t1 = net.trans_lookup_name (a1)
+                t2 = net.trans_lookup_name (a2)
+                assert (t1 != None and t2 != None)
+                #print 't1 t2 depen', t1, t2, td.get (t1, t2)
+                if td.get (t1, t2) :
+                    d.set (self.action_tab[a1], self.action_tab[a2])
+        #print 'on transitions', td
+        #print 'on actions', d
+        indep = Indep ()
+        indep.from_depen (d)
+        return indep
 
-class Indep :
+    def __str__ (self) :
+        return "traces %s actions %s" % (self.traces, self.action_tab.values ())
+
+class SymmetricRelation :
     def __init__ (self) :
-        pass
-    def __getitem__ (self, t1, t2) :
-        return False
+        self.pairs = set ()
+        self.negate = False
 
+    def set (self, t1, t2) :
+        if id (t1) < id (t2) :
+            self.pairs.add ((t1, t2))
+        else :
+            self.pairs.add ((t2, t1))
 
+    def get (self, t1, t2) :
+        if id (t1) < id (t2) :
+            r = (t1, t2) in self.pairs
+        else :
+            r = (t2, t1) in self.pairs
+        return not r if self.negate else r
+
+    def __getitem__ (self, (t1, t2)) :
+        return self.get (t1, t2)
+
+    def __iter__ (self) :
+        return iter (self.pairs)
+
+    def __repr__ (self) :
+        return "%d pairs tab %s negate %s" % (len (self.pairs), list (self.pairs), 'yes' if self.negate else 'no')
+    def __str__ (self) :
+        return repr (self)
+
+class Indep (SymmetricRelation) :
+    def __init__ (self) :
+        SymmetricRelation.__init__ (self)
+
+    def from_indep (self, indep) :
+        self.pairs = indep.pairs
+        self.negate = indep.negate
+
+    def from_depen (self, depen) :
+        self.pairs = depen.pairs
+        self.negate = not depen.negate
+
+    def check_is_independence (self, domain) :
+        # it is symmetric by construction, check it is irreflexive
+        for x in domain :
+            if self.get (x, x) :
+                raise Exception, "Not irreflexive: has pair (%s, %s)" % (repr (x), repr (x))
+
+    def from_net (self, n) :
+        d = Depen ()
+        d.from_net (n)
+        self.from_depen (d)
+
+    def __repr__ (self) :
+        return SymmetricRelation.__repr__ (self)
+    def __str__ (self) :
+        return SymmetricRelation.__str__ (self)
+
+class Depen (SymmetricRelation) :
+    def __init__ (self) :
+        SymmetricRelation.__init__ (self)
+
+    def from_indep (self, indep) :
+        self.pairs = indep.pairs
+        self.negate = not indep.negate
+
+    def from_depen (self, depen) :
+        self.pairs = depen.pairs
+        self.negate = depen.negate
+
+    def check_is_dependence (self, domain) :
+        # it is symmetric by construction, check it is reflexive
+        for x in domain :
+            if not self.get (x, x) :
+                raise Exception, "Not reflexive: missing pair (%s, %s)" % (repr (x), repr (x))
+
+    def from_net (self, n) :
+        d = Depen ()
+        for p in n.places :
+            for t1 in p.post | p.pre :
+                for t2 in p.post | p.pre :
+                    d.set (t1, t2)
+        self.from_depen (d)
+
+    def __repr__ (self) :
+        return SymmetricRelation.__repr__ (self)
+    def __str__ (self) :
+        return SymmetricRelation.__str__ (self)
 
 def log_from_xes(filename, all_info=False, only_uniq_cases=True):
     """Load a log in the XES format.

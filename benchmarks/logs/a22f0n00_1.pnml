@@ -686,7 +686,8 @@ Created with Workflow PetriNet Designer Version 3.2.0 (woped.org)-->
         <displayProbabilityPosition x="500.0" y="0.0"/>
       </toolspecific>
     </arc>
-    <arc id="a39" source="t18" target="p4">
+    <!-- original sent from Josep: <arc id="a39" source="t18" target="p4"> -->
+    <arc id="a39" source="t18" target="p10">
       <inscription>
         <text>1</text>
       </inscription>

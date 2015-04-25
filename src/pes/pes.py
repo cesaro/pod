@@ -30,7 +30,9 @@ class Event :
 
     def __str__ (self) :
         s = "e%d:%s" % (self.nr, repr (self.label))
+        s += " m " + str (self.m)
         s += " pre " + str (list (self.pre))
+        s += " post " + str (list (self.post))
         s += " cfl " + str (list (self.cfl)) + ";"
         return s
 
@@ -83,37 +85,48 @@ class PES :
         mblue = self.new_mark ()
         mgreen = self.new_mark ()
         work = [e]
+        l = []
+        ll = []
         while len (work) :
             ep = work.pop ()
             ep.m = mred
+            l.append (ep)
             for epp in ep.pre :
                 if epp.m != mred : work.append (epp)
             for epp in ep.cfl :
                 epp.m = mblue
+                ll.append (epp)
+        #print 'red', l
+        #print 'blue', ll
+        #print 'mred', mred, 'mblue', mblue, 'mgreen', mgreen
 
         # for remaining events, process them once their local config is
         # processed, color them in green
         work = list (self.minimal)
         while len (work) :
             ep = work.pop ()
+            #print 'at', ep
             assert (ep.m != mgreen)
             if ep.m == mblue : continue
             if ep.m != mred :
-                if not indep[e.label][ep.label] :
+                #print '  are indep %s %s %s' % (repr (e), repr (ep), indep.get (e.label, ep.label))
+                if not indep.get (e.label, ep.label) :
                     e.cfl_add (ep)
                     continue
-                ep.m = mgreen
+            ep.m = mgreen
             for e2 in ep.post :
                 # if every event in e2's preset is green or red, e2 is ready
                 found = False
                 for e3 in e2.pre :
-                    if e3 != mred and e3 != mgreen :
+                    if e3.m != mgreen :
                         found = True
                         break
                 if not found :
+                    #print '  adding', e2
                     work.append (e2)
 
     def write (self, f, fmt='dot') :
+        if isinstance (f, basestring) : f = open (f, 'w')
         if fmt == 'dot' : return self.__write_dot (f)
         raise Exception, "'%s': unknown output format" % fmt
 
@@ -125,13 +138,17 @@ class PES :
             f.write ('\t%s [label="%s"];\n' % (id (e), repr (e)))
 
         f.write ('\n\t/* causality and conflict */\n')
+        nrpre, nrcfl = 0, 0
         for e in self.events :
             for ep in e.pre :
                 f.write ('\t%s -> %s;\n' % (id (ep), id (e)))
+                nrpre += 1
             for ep in e.cfl :
                 if id (e) < id (ep) : continue
-                f.write ('\t%s -> %s [style=dashed];\n' % (id (ep), id (e)))
-        f.write ('\n\tgraph [label="%d events"];\n}\n' % len (self.events))
+                f.write ('\t%s -> %s [style=dashed arrowhead=none color=red];\n' % (id (ep), id (e)))
+                nrcfl += 1
+        f.write ('\n\tgraph [label="%d events\\n%d causalities\\n%d conflicts"];\n}\n' % \
+                (len (self.events), nrpre, nrcfl))
 
     def __repr__ (self) :
         return repr (self.events)
@@ -194,13 +211,13 @@ class Configuration :
         # returns set of concurrent (maximal) events
 
         # keep two lists, move dependent events to dep; mark hippies with m
-        m = self.new_mark ()
+        m = self.pes.new_mark ()
         dep = []
         work = list (self.__max)
         while len (work) :
             e = work.pop ()
             assert (e.m != m)
-            if not indep[e.label][t] :
+            if not indep.get (e.label, t) :
                 dep.append (e)
                 continue
             e.m = m

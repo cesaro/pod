@@ -4,7 +4,7 @@ import xml.parsers.expat
 
 class Transition :
     def __init__ (self, name) :
-        self.ident = None
+        self.tid = None
         self.name = name
         self.pre = set ()
         self.cont = set ()
@@ -75,7 +75,7 @@ class Transition :
 
 class Place :
     def __init__ (self, name) :
-        self.ident = None
+        self.pid = None
         self.name = name
         self.pre = set ()
         self.cont = set ()
@@ -236,8 +236,11 @@ class Net :
         self.sanity_check = sanity_check
         self.m = 1
 
-        self.__trans_lookup_table = None
-        self.__places_lookup_table = None
+        self.__lookup_trans_id = None
+        self.__lookup_trans_name = None
+        self.__lookup_place_id = None
+        self.__lookup_place_name = None
+        self.__lookup_need_update = True
 
         self.author = ''
         self.title = ''
@@ -245,27 +248,38 @@ class Net :
         self.note = ''
         self.version = ''
 
-    def trans_lookup (self, ident) :
+    def __str__ (self) :
+        return 'trans %s places %s m0 %s' % (self.trans, self.places, repr (self.m0))
 
-        if self.__trans_lookup_table == None :
-            self.__trans_lookup_table = {}
+    def update_lookup_tables (self) :
+        if self.__lookup_need_update :
+            self.__lookup_need_update = False
+            self.__lookup_trans_id = {}
+            self.__lookup_trans_name = {}
             for t in self.trans :
-                self.__trans_lookup_table[t.ident] = t
+                self.__lookup_trans_id[t.tid] = t
+                self.__lookup_trans_name[t.name] = t
+            self.__lookup_place_id = {}
+            self.__lookup_place_name = {}
+            for p in self.places :
+                self.__lookup_place_id[p.pid] = p
+                self.__lookup_place_name[p.name] = p
 
-        if ident in self.__trans_lookup_table :
-            return self.__trans_lookup_table[ident]
-        return None
+    def trans_lookup_id (self, tid) :
+        self.update_lookup_tables ()
+        return self.__lookup_trans_id.get (tid)
 
-    def place_lookup (self, ident) :
+    def place_lookup_id (self, pid) :
+        self.update_lookup_tables ()
+        return self.__lookup_place_id.get (pid)
 
-        if self.__places_lookup_table == None :
-            self.__places_lookup_table = {}
-            for t in self.places :
-                self.__places_lookup_table[t.ident] = t
+    def trans_lookup_name (self, name) :
+        self.update_lookup_tables ()
+        return self.__lookup_trans_name.get (name)
 
-        if ident in self.__places_lookup_table :
-            return self.__places_lookup_table[ident]
-        return None
+    def place_lookup_name (self, name) :
+        self.update_lookup_tables ()
+        return self.__lookup_place_name.get (name)
 
     def new_mark (self) :
         self.m += 1
@@ -487,6 +501,7 @@ class Net :
         p3.post_add (t3)
 
     def write (self, f, fmt='pep', m=0) :
+        if isinstance (f, basestring) : f = open (f, 'w')
         if fmt == 'pep' : return self.__write_pep (f, m)
         if fmt == 'dot' : return self.__write_dot (f, m)
         if fmt == 'grml' : return self.__write_grml (f, m)
@@ -506,7 +521,7 @@ class Net :
         tab = {'first' : 'element'}
         for p in self.places :
             if m != 0 and p.m != m : continue
-            m1 = 'M%d' % p.m0 if p.m0 > 0 else ''
+            m1 = 'M%d' % self.m0[p] if self.m0[p] > 0 else ''
             f.write ('%d"%s"9@9%s\n' % (len (tab), repr (p), m1))
             tab[p] = len (tab)
         f.write ('TR\n')
@@ -540,7 +555,7 @@ class Net :
 
         tab = {}
         for p in self.places :
-            f.write ('"%s" %d\n' % (repr (p), p.m0))
+            f.write ('"%s" %d\n' % (repr (p), self.m0[p]))
             tab[p] = len (tab)
 
         for t in self.trans :
@@ -739,7 +754,8 @@ class Net :
             f.write (s)
         f.write ('\n</model>\n')
 
-    def read (self, f, fmt='pep') :
+    def read (self, f, fmt='pnml') :
+        if isinstance (f, basestring) : f = open (f, 'r')
         if fmt == 'pep' : return self.__read_pep (f)
         if fmt == 'pt1' : return self.__read_pt1 (f)
         if fmt == 'grml' : return self.__read_grml (f)
@@ -951,7 +967,7 @@ class Net :
         self.__pnmlskipdepth = sys.maxint
         par.ParseFile (f)
         if len (self.__pnmlitm) == 0 :
-            raise Exception, 'missplaced "%s" entity' % tag
+            raise Exception, 'missplaced entity'
         self.__pnmlq.append (self.__pnmlitm)
 
         idx = {}
@@ -961,10 +977,10 @@ class Net :
             if d['type'] == 'place' :
                 if 'm0' not in d : d['m0'] = 0
                 idx[d['id']] = self.place_add (d['name'], int (d['m0']))
-                idx[d['id']].ident = d['id']
+                idx[d['id']].pid = d['id']
             elif d['type'] == 'transition' :
                 idx[d['id']] = self.trans_add (d['name'])
-                idx[d['id']].ident = d['id']
+                idx[d['id']].tid = d['id']
             elif d['type'] == 'net' :
                 self.title = d['name']
         for d in self.__pnmlq :
@@ -999,6 +1015,7 @@ class Net :
                 if k in self.__pnmlitm :
                     self.__pnmlitm[k] = self.__pnmlitm[k].strip(' \n\t')
             self.__pnmlq.append (self.__pnmlitm)
+            #print '-- recoding', self.__pnmlitm
             self.__pnmlitm = {}
             self.__pnmlitm['type'] = tag
             self.__pnmlitm['id'] = attr['id']
@@ -1032,6 +1049,9 @@ class Net :
         self.__pnmldepth -= 1
         if self.__pnmldepth < self.__pnmlskipdepth :
             self.__pnmlskipdepth = sys.maxint
+        if tag == 'text' and 'data' in self.__pnmlitm:
+            del self.__pnmlitm['data']
+            # this avoids recording data outside a <text> tag
 
     def __pnml_data (self, data):
         #data = data.strip(' \n\t') <- dangerous here, data can be split!!
