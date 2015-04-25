@@ -359,7 +359,7 @@ def test15 () :
     l = Log ()
     #l.read ('benchmarks/logs/incidenttelco.anon.xes')
     l.read ('benchmarks/logs/a22f0n00_1.xes')
-    l.traces = l.traces[0:10]
+    #l.traces = l.traces[0:60]
     print 'log', l
 
     indep = Indep ()
@@ -370,7 +370,7 @@ def test15 () :
     n.read ('benchmarks/logs/a22f0n00_1.pnml')
     n.write ('a22.dot', 'dot')
     print 'net', n
-    #indep = l.extract_indep_from_net (n)
+    indep = l.extract_indep_from_net (n)
     print 'indep', indep
     es = l.to_pes (indep)
     es.write ('full.dot', 'dot')
