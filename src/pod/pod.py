@@ -125,7 +125,7 @@ class Pod :
 
         return net
 
-    def pes_to_bp (self, es) :
+    def pes_to_bp (self, es, indep) :
         unf = ptnet.Unfolding ()
 
         # generate the events of the unfolding
@@ -142,8 +142,8 @@ class Pod :
 
         # for every two events in causal relation in the PES, generate
         # conditions (skiping causalities already introduced before)
-        pre_tab = self.__pes_to_bp_gen_conds_pre (es, unf, ev_tab, pre_tab)
-        return unf
+        pre_tab = self.__pes_to_bp_gen_conds_pre_clique_based (es, unf, ev_tab, pre_tab, indep)
+        #pre_tab = self.__pes_to_bp_gen_conds_pre (es, unf, ev_tab, pre_tab)
 
         # we are done!
         return unf
@@ -205,6 +205,34 @@ class Pod :
                 if (ep, e) not in pre_tab :
                     c = unf.cond_add (None, [ev_tab[ep]], [ev_tab[e]])
                     pre_tab[ep, e] = c
+            if len (e.pre) == 0 :
+                if (None, e) not in pre_tab :
+                    c = unf.cond_add (None, [], [ev_tab[e]])
+                    pre_tab[None, e] = c
+        return pre_tab
+
+    def __pes_to_bp_gen_conds_pre_clique_based (self, es, unf, ev_tab, pre_tab, indep) :
+        for e in es.events :
+            # for all events in e.post, build graph whose edges are
+            # the dependence relation
+            g = networkx.Graph ()
+            g.add_nodes_from (e.post)
+            for e1 in e.post :
+                for e2 in e.post :
+                    if e1 != e2 and not indep[e1.label, e2.label] :
+                        g.add_edge (e1, e2)
+            # for every clique, generate one condition
+            for clique in networkx.find_cliques (g) :
+                # remove events for which there is already condition
+                for ep in [ep for ep in clique if (e, ep) in pre_tab] :
+                    clique.remove (ep)
+                if len (clique) == 0 : continue
+                unfpostevs = [ev_tab[ep] for ep in clique]
+                c = unf.cond_add (None, [ev_tab[e]], unfpostevs)
+                for ep in clique :
+                    pre_tab[e, ep] = c
+            # events with empty preset will never occurr in previous
+            # search, deal with them separately
             if len (e.pre) == 0 :
                 if (None, e) not in pre_tab :
                     c = unf.cond_add (None, [], [ev_tab[e]])

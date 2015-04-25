@@ -309,6 +309,14 @@ class Unfolding (net.Net) :
         for c in rem_conds :
             self.remove_cond (c.nr)
 
+    def mark_local_config (self, m, elems) :
+        work = elems
+        while len (work) :
+            x = work.pop ()
+            x.m = m
+            for y in x.pre :
+                if y.m != m : work.append (y)
+
     def is_configuration (self, s) :
         pre = set ()
         for e in s :

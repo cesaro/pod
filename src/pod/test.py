@@ -391,6 +391,7 @@ def test16 () :
     g.add_edge (6, 8)
     g.add_edge (7, 8)
     g.add_edge (8, 7)
+    g.add_nodes_from (range (1, 12))
 
     print 'edges', g.edges ()
     print 'maximal cliques', list (networkx.find_cliques (g))
@@ -435,7 +436,7 @@ def test18 () :
     # configurations, intersection, get_local_config
     l = Log ()
     l.read ('benchmarks/logs/a22f0n00_1.xes')
-    #l.traces = l.traces[0:40]
+    l.traces = l.traces[0:30]
     print 'log', l
 
     n = ptnet.Net ()
@@ -447,13 +448,19 @@ def test18 () :
     pod = Pod ()
     print 'es (before)', es, 'nr actions', len (l.action_tab)
     print 'xxxxxxxxxxxxxxx'
-    unf = pod.pes_to_bp (es)
+    unf = pod.pes_to_bp (es, indep)
     print 'yyyyyyyyyyyyyyyyyy'
     print 'es (after) ', es
     print 'unf.events', unf.events
     print 'unf.conds', unf.conds
     print 'unf.net.trans', unf.net.trans, 'size', len (unf.net.trans)
     print 'unf.net.places', unf.net.places
+
+    m = unf.new_mark ()
+    #unf.mark_context (m, [unf.events[i] for i in [12,26]], 3)
+    #unf.mark_local_config (m, [unf.events[i] for i in [265,280]])
+    unf.mark_context (m, unf.get_set_from_mark (m), 1)
+    #unf.write ('unf.dot', 'dot', m)
     unf.write ('unf.dot', 'dot')
 
 

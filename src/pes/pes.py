@@ -70,7 +70,7 @@ class PES :
 
     def get_local_config (self, e) :
         m = self.new_mark ()
-        self.mark_local_config ([e], m)
+        self.mark_local_config (m, [e])
         return self.get_config_from_mark (m)
 
     def get_config_from_mark (self, m) :
@@ -97,7 +97,7 @@ class PES :
             if len (s) == 0 : return config
             config.add (s.pop ())
 
-    def mark_local_config (self, events, m) :
+    def mark_local_config (self, m, events) :
         work = events
         while len (work) :
             e = work.pop ()

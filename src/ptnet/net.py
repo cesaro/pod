@@ -500,6 +500,28 @@ class Net :
         t2b.post_add (p3)
         p3.post_add (t3)
 
+    def get_set_from_mark (self, m) :
+        result = set ()
+        for t in self.trans :
+            if t.m == m : result.add (t)
+        for p in self.places :
+            if p.m == m : result.add (p)
+        return result
+
+    def mark_context (self, m, elems, distance=1) :
+        work = []
+        for x in elems :
+            x.m = m
+            work.append (x)
+        for i in range (distance) :
+            work2 = []
+            for x in work :
+                for y in x.pre | x.post | x.cont :
+                    if y.m != m :
+                        y.m = m
+                        work2.append (y)
+            work = work2
+
     def write (self, f, fmt='pep', m=0) :
         if isinstance (f, basestring) : f = open (f, 'w')
         if fmt == 'pep' : return self.__write_pep (f, m)
@@ -577,8 +599,7 @@ class Net :
     # FIXME -- this method has never been tested !!
     # FIXME -- the line type (x.pre) will return Instance, not Event!
     def __write_ctxdot_items (self, f, items, n, prefx='', full=True) :
-        self.m += 1
-        m = self.m
+        m = self.new_mark ()
 
         t = set (items)
         for x in t :
