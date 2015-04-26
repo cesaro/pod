@@ -12,6 +12,26 @@ class Action :
     def __str__ (self) :
         return repr (self)
 
+class ActionSet :
+    def __init__ (self) :
+        self.tab = {}
+
+    def lookup (self, name) :
+        return self.tab.get (name)
+
+    def lookup_or_create (self, name) :
+        try :
+            return self.tab[name]
+        except KeyError :
+            a = Action (name)
+            self.tab[name] = a
+            return a
+
+    def __iter__ (self) :
+        iter (self.tab.values ())
+    def __len__ (self) :
+        len (self.tab)
+
 class Event :
     def __init__ (self, action, attr) :
         self.action = action
@@ -62,8 +82,6 @@ class Log :
                 seq.append (e)
             self.traces.append (seq)
             nre += len (seq)
-        print 'pod: xes: done, %d logs, %d log events, %d distinct actions' \
-                % (len (self.traces), nre, len (self.action_tab))
 
     def to_pes (self, indep) :
         es = pes.PES ()
@@ -125,9 +143,10 @@ class Log :
         return "traces %s actions %s" % (self.traces, self.action_tab.values ())
 
 class SymmetricRelation :
-    def __init__ (self) :
+    def __init__ (self, domain) :
         self.pairs = set ()
         self.negate = False
+        self.domain = domain
 
     def set (self, t1, t2) :
         if id (t1) < id (t2) :
@@ -147,6 +166,8 @@ class SymmetricRelation :
 
     def __iter__ (self) :
         return iter (self.pairs)
+    def __len__ (self) :
+        return len (self.pairs)
 
     def __repr__ (self) :
         return "%d pairs tab %s negate %s" % (len (self.pairs), list (self.pairs), 'yes' if self.negate else 'no')
@@ -154,25 +175,27 @@ class SymmetricRelation :
         return repr (self)
 
 class Indep (SymmetricRelation) :
-    def __init__ (self) :
-        SymmetricRelation.__init__ (self)
+    def __init__ (self, domain) :
+        SymmetricRelation.__init__ (self, domain)
 
     def from_indep (self, indep) :
         self.pairs = indep.pairs
         self.negate = indep.negate
+        self.domain = indep.domain
 
     def from_depen (self, depen) :
         self.pairs = depen.pairs
         self.negate = not depen.negate
+        self.domain = depen.domain
 
-    def check_is_independence (self, domain) :
+    def check_is_independence (self) :
         # it is symmetric by construction, check it is irreflexive
-        for x in domain :
+        for x in self.domain :
             if self.get (x, x) :
                 raise Exception, "Not irreflexive: has pair (%s, %s)" % (repr (x), repr (x))
 
-    def from_net (self, n) :
-        d = Depen ()
+    def from_net (self, n, action_set=None) :
+        d = Depen (action_set, action_set)
         d.from_net (n)
         self.from_depen (d)
 
@@ -188,19 +211,24 @@ class Depen (SymmetricRelation) :
     def from_indep (self, indep) :
         self.pairs = indep.pairs
         self.negate = not indep.negate
+        self.domain = indep.domain
 
     def from_depen (self, depen) :
         self.pairs = depen.pairs
         self.negate = depen.negate
+        self.domain = indep.domain
 
-    def check_is_dependence (self, domain) :
+    def check_is_dependence (self) :
         # it is symmetric by construction, check it is reflexive
-        for x in domain :
+        for x in self.domain :
             if not self.get (x, x) :
                 raise Exception, "Not reflexive: missing pair (%s, %s)" % (repr (x), repr (x))
 
-    def from_net (self, n) :
-        d = Depen ()
+    def from_net (self, n, action_set=None) :
+        if action_set == None :
+            action_set = Actionset ()
+        for t in n.trans : action_set.lookup_or_create (t.name)
+        d = Depen (action_set)
         for p in n.places :
             for t1 in p.post | p.pre :
                 for t2 in p.post | p.pre :

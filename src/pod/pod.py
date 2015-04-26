@@ -59,15 +59,20 @@ if sys.version_info < (2, 7, 0) or sys.version_info >= (3, 0, 0) :
 
 class Pod :
     def __init__ (self) :
-        self.log_path = ""
-        self.log_first = 0
-        self.log_only = []
-        self.log_exclude = []
-        self.log = None
 
-        self.output_path = ""
-        self.indep_path = ""
-        self.command = ""
+        self.arg_command = ""
+        self.arg_log_path = ""
+        self.arg_indep_path = ""
+
+        self.arg_log_first = -1
+        self.arg_log_only = []
+        self.arg_log_exclude = []
+        self.arg_log_negative = ""
+        self.arg_output_path = ""
+
+        self.log = None
+        self.log_negative = None
+        self.indep = None
 
     def parse_cmdline_args (self) :
 
@@ -78,7 +83,8 @@ class Pod :
         #p.add_argument ("-h", "--help", action="store_true")
         p.add_argument ("--log-first", type=int)
         p.add_argument ("--log-only")
-        p.add_argument ("--log-exclude", default=[])
+        p.add_argument ("--log-negative")
+        p.add_argument ("--log-exclude")
         p.add_argument ("--output")
         #p.add_argument ("--format", choices=["pdf","dot","pnml"])
 
@@ -93,15 +99,25 @@ class Pod :
         #    print __doc__
         #    sys.exit (0);
 
-        self.command = args.cmd
-        self.indep_path = args.indep
-        self.log_path = args.log_pnml
-        self.log_exclude = args.log_exclude
-        self.log_only = args.log_only
-        self.log_first = args.log_first
+        self.arg_command = args.cmd
+        self.arg_indep_path = args.indep
+        self.arg_log_path = args.log_pnml
+        self.arg_log_first = args.log_first
+        self.arg_log_negative = args.log_negative
+
+        if args.log_only != None :
+            try :
+                self.arg_log_only = [int (x) for x in args.log_only.split (",")]
+            except Exception :
+                raise Exception, "'%s': expected a comma-separated list of numbers" % (args.log_only)
+        if args.log_exclude != None :
+            try :
+                self.arg_log_exclude = [int (x) for x in args.log_exclude.split (",")]
+            except Exception :
+                raise Exception, "'%s': expected a comma-separated list of numbers" % (args.log_exclude)
 
         if args.output != None :
-            self.output_path = args.output
+            self.arg_output_path = args.output
         else :
             d = {
                 "extract-dependence" : "dependence.txt",
@@ -109,17 +125,25 @@ class Pod :
                 "dump-bp"            : "bp.pdf",
                 "dump-encoding"      : "encoding.smt2",
                 "merge"              : "output.pnml"}
-            self.output_path = d.get (self.command, "output.txt")
-        for opt in ["log_path", "log_first", "log_only", "log_exclude",
-                    "output_path", "indep_path", "command"] :
-            output_pair (sys.stdout, opt, self.__dict__[opt], 11, "pod: args: ")
+            self.arg_output_path = d.get (self.arg_command, "output.txt")
+        for opt in [
+                    "arg_command",
+                    "arg_indep_path",
+                    "arg_log_path",
+                    "arg_log_first",
+                    "arg_log_only",
+                    "arg_log_exclude",
+                    "arg_log_negative",
+                    "arg_output_path",
+                    ] :
+            output_pair (sys.stdout, opt, self.__dict__[opt], 16, "pod: args: ")
 
     def main (self) :
         self.parse_cmdline_args ()
 
-        if self.command == "extract-dependence" :
+        if self.arg_command == "extract-dependence" :
             self.cmd_extract_dependence ()
-        elif self.command == "dump-log" :
+        elif self.arg_command == "dump-log" :
             self.cmd_dump_log ()
         else :
             raise Exception, "Shit happened!"
@@ -127,7 +151,7 @@ class Pod :
     def cmd_extract_dependence (self) :
 
         # load the net
-        net = load_net (self.log_path, "pnml", "pod: extract: ")
+        net = load_net (self.arg_log_path, "pnml", "pod: extract: ")
 
         # create a dependence relation and fill it from the net
         dep = Depen ()
@@ -148,13 +172,88 @@ class Pod :
             s.add (t.name)
 
         # save
-        f = open (self.output_path, "w")
+        try :
+            f = open (self.arg_output_path, "w")
+        except Exception as (e, m) :
+            raise Exception, "'%s': %s" % (self.arg_output_path, m)
         f.write ("# Dependence relation automatically extracted from:\n")
-        f.write ("# %s\n" % self.log_path)
+        f.write ("# %s\n" % self.arg_log_path)
         for (t1, t2) in dep.pairs :
             f.write ("%s %s\n" % (t1.name, t2.name))
         f.close ()
-        print "pod: extract: output saved to '%s'" % self.output_path
+        print "pod: extract: output saved to '%s'" % self.arg_output_path
+
+    def cmd_dump_log (self) :
+        pass
+
+    def cmd_merge (self) :
+
+        # load logs
+        print "pod: merge: loading log with positive information"
+        self.log = self.__load_log (self.arg_log_path, \
+                "pod: merge: positive")
+
+        if self.arg_log_negative != None :
+            print "pod: merge: loading log with negative information"
+            self.log_negative = self.__load_log (self.arg_log_negative, \
+                    "pod: merge: negative")
+
+        # load the independence relation
+        self.__load_indep ()
+
+        # build the PES
+        es = self.log.to_pes (indep)
+
+        # build the BP
+        # construir el encoding
+        # pasarselo a z3
+        # construir la equivalencia
+        # fusionar
+        # guardar el resultado
+
+    def __laod_log (self, path, prefix="pod: ") :
+        log = Log ()
+        try :
+            size = os.path.getsize (path) / (1024 * 1024.0)
+            print "%sloading log file '%s' (%.1fM), assuming XES format" % (prefix, path, size)
+            f = open (path, 'r')
+            log.read (f, 'xes')
+            f.close ()
+        except Exception as (e, m) :
+            raise Exception, "'%s': %s" % (path, m)
+        print '%sdone, %d logs, %d log events, %d distinct actions' \
+                % (prefix, len (self.traces), nre, len (self.action_tab))
+        return log
+
+    def __load_indep (self, path, acset, prefix="pod: ") :
+        dep = Depen (acset)
+        try :
+            print "%sloading dependence relation '%s'" % (prefix, path)
+            f = open (self.arg_indep_path, 'r')
+            i = 0
+            for line in f :
+                i += 1
+                line = line.lstrip ()
+                if len (line) == 0 : continue
+                if line[0] == '#' : continue
+                ls = line.split ()
+                if len (ls) != 2 :
+                    raise Exception, "line %d: expected two words"
+                a1 = acset.lookup (ls[0])
+                if a1 == None :
+                    print "%sline %d: NOTICE: new action '%s' not happening in the logs" % (prefix, i, ls[0])
+                    a1 = acset.lookup_or_create (ls[0])
+                a2 = acset.lookup (ls[1])
+                if a2 == None :
+                    print "%sline %d: NOTICE: new action '%s' not happening in the logs" % (prefix, i, ls[1])
+                    a2 = acset.lookup_or_create (ls[1])
+                dep.set (a1, a2)
+            f.close ()
+        except Exception as (e, m) :
+            raise Exception, "'%s': %s" % (self.arg_indep_path, m)
+        print '%sdone, %d pairs, %d distinct actions known' \
+                % (prefix, len (dep), len (acset))
+        return log
 
     def __assert_merge_pre (self, unf, me) :
 

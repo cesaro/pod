@@ -105,14 +105,13 @@ TODO
 Commandline syntax
 ==================
 
-
-pod [OPTIONS] extract-dependence PNML
-pod [OPTIONS] dump-log LOGFILE
-pod [OPTIONS] dump-pes LOGFILE INDEPFILE
-pod [OPTIONS] dump-bp LOGFILE INDEPFILE
-pod [OPTIONS] dump-encoding LOGFILE INDEPFILE
-pod [OPTIONS] dump-merge LOGFILE INDEPFILE
-pod [OPTIONS] merge LOGFILE INDEPFILE
+pod [OPTIONS] extract-dependence	PNML
+pod [OPTIONS] dump-log  			LOGFILE
+pod [OPTIONS] dump-pes  			LOGFILE INDEPFILE
+pod [OPTIONS] dump-bp   			LOGFILE INDEPFILE
+pod [OPTIONS] dump-encoding		LOGFILE INDEPFILE
+pod [OPTIONS] dump-merge			LOGFILE INDEPFILE
+pod [OPTIONS] merge					LOGFILE INDEPFILE
 
 
 
@@ -122,6 +121,12 @@ OPTIONS:
 --log-first=n					default: -1
 --log-only=1,2,4				default: ""
 --log-exclude=7,23
+--log-negative=PATH
 --output=PATH
 #--format={pdf,dot,pnml}
 
+
+- modify the Log to operate with an ActionSet
+- modify __load_log to operate with an ActionSet
+x also __load_indep
+x also SymmetricRelation, Depen, Indep
