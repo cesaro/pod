@@ -1,13 +1,30 @@
+"""
+pod [OPTIONS] COMMAND LOGFILE/PNMLFILE [INDEPFILE]
+
+Bla bla bla
+
+COMMAND is one of Bla
+LOGFILE is the path to an XML file containing formulas (MCC 2015 format)
+
+And OPTIONS is zero or more of the following options
+
+ --log-first=N
+   Use only the first N sequences of the log file.
+
+ ...
+
+"""
 
 try :
     import os
     import sys
     import resource
     import networkx
+    import argparse
 
-    import util
-    import merging
-    import log
+    from util import *
+    from log import *
+    from merging import *
 
     import z3
     import ptnet
@@ -25,10 +42,63 @@ if sys.version_info < (2, 7, 0) or sys.version_info >= (3, 0, 0) :
 
 class Pod :
     def __init__ (self) :
-        pass
+        self.log_path = ""
+        self.log_first = 0
+        self.log_only = []
+        self.log_exclude = []
+        self.log = None
 
-    def main (self, args) :
-        pass
+        self.output_path = ""
+        self.indep_path = ""
+        self.command = ""
+
+    def parse_cmdline_args (self) :
+
+        cmd_choices = ["extract-dependence", "dump-log", "dump-pes",
+                "dump-bp", "dump-encoding", "dump-merge", "merge"]
+        #p = argparse.ArgumentParser (usage = __doc__, add_help=False)
+        p = argparse.ArgumentParser ()
+        #p.add_argument ("-h", "--help", action="store_true")
+        p.add_argument ("--log-first", type=int)
+        p.add_argument ("--log-only")
+        p.add_argument ("--log-exclude", default=[])
+        p.add_argument ("--output")
+        #p.add_argument ("--format", choices=["pdf","dot","pnml"])
+
+        p.add_argument ('cmd', metavar="COMMAND", choices=cmd_choices)
+        p.add_argument ('log_pnml', metavar="LOGFILE/PNML")
+        p.add_argument ('indep', metavar="INDEPFILE", nargs="?", default=None)
+
+        args = p.parse_args ()
+        print "pod: args:", args
+
+        #if args.help :
+        #    print __doc__
+        #    sys.exit (0);
+
+        self.command = args.cmd
+        self.indep_path = args.indep
+        self.log_path = args.log_pnml
+        self.log_exclude = args.log_exclude
+        self.log_only = args.log_only
+        self.log_first = args.log_first
+
+        if args.output != None :
+            self.output_path = args.output
+        else :
+            d = {
+                "extract-dependence" : "dependence.txt",
+                "dump-pes"           : "pes.pdf",
+                "dump-bp"            : "bp.pdf",
+                "dump-encoding"      : "encoding.smt2",
+                "merge"              : "output.pnml"}
+            self.output_path = d.get (self.command, "output.txt")
+        for opt in ["log_path", "log_first", "log_only", "log_exclude",
+                    "output_path", "indep_path", "command"] :
+            output_pair (sys.stdout, opt, self.__dict__[opt], 11, "pod: args: ")
+
+    def main (self) :
+        self.parse_cmdline_args ()
 
     def __assert_merge_pre (self, unf, me) :
 

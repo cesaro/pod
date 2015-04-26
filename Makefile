@@ -4,7 +4,7 @@ include defs.mk
 .PHONY: fake all g test clean distclean prof dist
 
 all:
-	-./src/pod.py
+	-./src/pod.py --help
 
 bench_build_unfoldings :
 	for i in benchmarks/nets/*.ll_net; do echo $i; j=`echo $i | sed 's/.ll_net//'`; echo $j; cunf -v $i -s $j.cuf; done

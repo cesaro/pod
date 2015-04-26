@@ -106,7 +106,7 @@ Commandline syntax
 ==================
 
 
-pod [OPTIONS] dependence-extract PNML
+pod [OPTIONS] extract-dependence PNML
 pod [OPTIONS] dump-log LOGFILE
 pod [OPTIONS] dump-pes LOGFILE INDEPFILE
 pod [OPTIONS] dump-bp LOGFILE INDEPFILE
@@ -115,11 +115,13 @@ pod [OPTIONS] dump-merge LOGFILE INDEPFILE
 pod [OPTIONS] merge LOGFILE INDEPFILE
 
 
+
 OPTIONS:
 
---log-first=n
---log-only=1,2,4
+--help, -h
+--log-first=n					default: -1
+--log-only=1,2,4				default: ""
 --log-exclude=7,23
 --output=PATH
---format={pdf,dot,pnml}
+#--format={pdf,dot,pnml}
 

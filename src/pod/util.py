@@ -1,12 +1,12 @@
 
-def print_stats (f, d, prefix='podisc: ') :
+def output_dict (f, d, prefix='podisc: ') :
     n = max ([len (k) for k in d])
     l = list (d)
     l.sort ()
     for k in l :
         output (f, k, d[k], n, prefix)
 
-def output (f, k, v, n, prefix='', fmt='%s') :
+def output_pair (f, k, v, n, prefix='', fmt='%s') :
     f.write (prefix + ('%-*s : ' + fmt + '\n') % (n, k, v))
 
 def error_missing_package (exception) :
