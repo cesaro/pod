@@ -7,12 +7,24 @@ from util import *
 from encoding import *
 
 class MergingEquivalence :
+    def __init__ (self, domain) :
+        self.domain = domain
+
+    def __is_in_domain (self, it) :
+        for x in it :
+            if x not in self.domain :
+                raise LookupError, "'%s' is not in the domain" % repr (x)
+
     def are_merged (self, x, y) :
+        self.__is_in_domain ([x, y])
         return x == y
+
     def class_of (self, x) :
+        self.__is_in_domain ([x])
         return [x]
+
     def classes (self) :
-        raise NotImplementedError
+        return [[x] for x in self.domain]
 
     def __repr__ (self) :
         return str (self.classes ())
@@ -20,13 +32,15 @@ class MergingEquivalence :
         return repr (self)
 
 class Smt2MergingEquivalence (MergingEquivalence) :
-    def __init__ (self, enc) :
+    def __init__ (self, domain, enc) :
+        MergingEquivalence.__init__ (self, domain)
         self.enc = enc
         self.model = enc.z3.model ()
 
     def are_merged (self, x, y) :
-        if isinstance (x, ptnet.unfolding.Condition) :
-            assert (isinstance (y, ptnet.unfolding.Condition))
+        self.__is_in_domain ([x, y])
+        if isinstance (x, ptnet.Condition) :
+            assert (isinstance (y, ptnet.Condition))
 
             vx = self.enc.smt_varmap (x)
             vy = self.enc.smt_varmap (y)
@@ -39,8 +53,8 @@ class Smt2MergingEquivalence (MergingEquivalence) :
             return self.model[vx].as_long () == self.model[vy].as_long ()
 
         else :
-            assert (isinstance (x, ptnet.unfolding.Event))
-            assert (isinstance (y, ptnet.unfolding.Event))
+            assert (isinstance (x, ptnet.Event))
+            assert (isinstance (y, ptnet.Event))
 
             if x.label != y.label : return False
             vx = self.enc.smt_varmap (x)
@@ -50,21 +64,20 @@ class Smt2MergingEquivalence (MergingEquivalence) :
             return self.model[vx].as_long () == self.model[vy].as_long ()
 
     def class_of (self, x) :
-        raise NotImplementedError
+        raise RuntimeError
     def classes (self) :
-        raise NotImplementedError
+        raise RuntimeError
     def __str__ (self) :
         return str (self.model)
 
 class ComputedMergingEquivalence (MergingEquivalence) :
     def __init__ (self, domain) :
+        MergingEquivalence.__init__ (self, domain)
         self.class_by_id = {}
         self.class_by_member = {}
-        self.domain = domain
 
     def set_class (self, x, class_id) :
-        if x not in self.domain :
-            raise ValueError, "'%s' is not in the domain" % repr (x)
+        self.__is_in_domain ([x])
         if class_id in self.class_by_id :
             self.class_by_id[class_id].add (x)
         else :
@@ -74,13 +87,11 @@ class ComputedMergingEquivalence (MergingEquivalence) :
         
     def are_merged (self, x, y) :
         if x == y : return True
-        if x not in self.class_by_member or y not in self.class_by_member :
-            raise LookupError, \
-                "Unknown equivalence class for either '%s' or '%s'" % \
-                (repr (x), repr (y))
+        self.__is_in_domain ([x, y])
         return self.class_by_member[x] == self.class_by_member[y]
 
     def class_of (self, x) :
+        self.__is_in_domain ([x])
         if x not in self.class_by_member :
             raise LookupError, \
                 "'%s': unknown equivalence class" % repr (x)
@@ -90,9 +101,6 @@ class ComputedMergingEquivalence (MergingEquivalence) :
         raise self.class_by_member.values ()
 
 class IdentityMergingEquivalence (MergingEquivalence) :
-    def __init__ (self, domain) :
-        self.domain = domain
-    def classes (self) :
-        return [[x] for x in self.domain]
+    pass
 
 # vi:ts=4:sw=4:et:

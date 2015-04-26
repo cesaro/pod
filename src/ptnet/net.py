@@ -679,7 +679,7 @@ class Net :
             if m != 0 and c.m != m : continue
             s = '<place id="p%d">\n' % len (tab)
             s += '<name><text>%s</text></name>\n' % repr (p)
-            s += '<initialMarking> <text>%d</text> </initialMarking>\n' % p.m0
+            s += '<initialMarking><text>%d</text></initialMarking>\n' % self.m0[p]
             s += '</place>\n'
             f.write (s)
             tab[p] = len (tab)

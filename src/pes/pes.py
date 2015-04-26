@@ -30,10 +30,11 @@ class Event :
 
     def __str__ (self) :
         s = "e%d:%s" % (self.nr, repr (self.label))
-        s += " m " + str (self.m)
         s += " pre " + str (list (self.pre))
         s += " post " + str (list (self.post))
-        s += " cfl " + str (list (self.cfl)) + ";"
+        s += " cfl " + str (list (self.cfl))
+        #s += " m " + str (self.m)
+        #s += ";"
         return s
 
 class PES :
@@ -185,7 +186,7 @@ class PES :
         return repr (self.events)
 
     def __str__ (self) :
-        return repr (self.events)
+        return "events %s minimal %s" % (repr (self.events), repr (self.minimal))
     
 class Configuration :
     #def __init__ (self, pes, events=set()) :

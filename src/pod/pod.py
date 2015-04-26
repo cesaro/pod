@@ -69,17 +69,35 @@ class Pod :
         self.arg_log_only = []
         self.arg_log_exclude = []
         self.arg_log_negative = ""
+
         self.arg_output_path = ""
+        self.arg_eq = "id"
 
         self.acset = None
         self.log = None
         self.log_negative = None
         self.indep = None
+        self.pes = None
+        self.meq = None
+        self.bp = None
+        self.net = None
 
     def parse_cmdline_args (self) :
 
-        cmd_choices = ["extract-dependence", "dump-log", "dump-pes",
-                "dump-bp", "dump-encoding", "dump-merge", "merge"]
+        cmd_choices = [
+                "extract-dependence",
+                "dump-log",
+                "dump-pes",
+                "dump-bp",
+                "dump-encoding",
+                "dump-merge",
+                "merge",
+                ]
+        eq_choices = [
+                "id",
+                "sp-all",
+                "sp-pre",
+                ]
         #p = argparse.ArgumentParser (usage = __doc__, add_help=False)
         p = argparse.ArgumentParser (usage=__doc__)
         #p.add_argument ("-h", "--help", action="store_true")
@@ -88,6 +106,7 @@ class Pod :
         p.add_argument ("--log-negative")
         p.add_argument ("--log-exclude")
         p.add_argument ("--output")
+        p.add_argument ("--eq", choices=eq_choices, default="id")
         #p.add_argument ("--format", choices=["pdf","dot","pnml"])
 
         p.add_argument ('cmd', metavar="COMMAND", choices=cmd_choices)
@@ -103,6 +122,7 @@ class Pod :
 
         self.arg_command = args.cmd
         self.arg_depen_path = args.depen
+        self.arg_eq = args.eq
         self.arg_log_path = args.log_pnml
         self.arg_log_first = args.log_first
         self.arg_log_negative = args.log_negative
@@ -141,6 +161,7 @@ class Pod :
                     "arg_log_exclude",
                     "arg_log_negative",
                     "arg_output_path",
+                    "arg_eq",
                     ] :
             output_pair (sys.stdout, opt, self.__dict__[opt], 16, "pod: args: ")
 
@@ -200,29 +221,59 @@ class Pod :
         # create a new action set
         self.acset = ActionSet ()
 
-        # load logs
+        # load the positive log
         print "pod: merge: loading log with positive information"
         self.log = self.__load_log (self.arg_log_path, \
                 "pod: merge: positive: ")
+        #self.log.traces = self.log.traces[:2]
 
+        # create another log to store positive and negative information and
+        # set its actionset to the be the same as the positive log, so all
+        # the three logs will share the same ActionSet
+        self.log_both = self.log.clone ()
+        self.log_both.actionset = self.acset
+
+        # load negative and fill log_both
         if self.arg_log_negative != None :
             print "pod: merge: loading log with negative information"
             self.log_negative = self.__load_log (self.arg_log_negative, \
                     "pod: merge: negative: ")
+            self.log_both.union (self.log_negative)
 
         # load the independence relation
         self.__load_indep ("pod: merge: independence: ")
 
         # build the PES
-        return
-        es = self.log.to_pes (self.indep)
+        print "pod: merge: building the PES from the logs..."
+        self.pes = self.log_both.to_pes (self.indep)
+        print "pod: merge: done, %d events, %d minimal, %.2f avg. preset size" % \
+                (len (self.pes.events),
+                len (self.pes.minimal),
+                avg_iter (len (e.pre) for e in self.pes.events))
+
+        #print 'indep', self.indep
+        #print 'es', es
+        #print 'log positive', repr (self.log)
+        #print 'log negative', repr (self.log_negative)
+        #print 'log both', repr (self.log_both)
 
         # build the BP
-        # construir el encoding
-        # pasarselo a z3
-        # construir la equivalencia
-        # fusionar
-        # guardar el resultado
+        print "pod: merge: building the BP from the PES..."
+        self.bp = self.pes_to_bp (self.pes, self.indep)
+        print "pod: merge: done, %d events, %d conditions" % \
+                (len (self.bp.events), len (self.bp.conds))
+
+        # merge the BP into a net
+        self.__merge ()
+
+        # save the net
+        f = open (self.arg_output_path, "w")
+        self.net.write (f, 'pnml')
+        f.close ()
+        #try :
+        #except Exception as (e, m) :
+        #    raise Exception, "'%s': %s" % (self.arg_output_path, m)
+        print "pod: merge: net saved to '%s'" % self.arg_output_path
 
     def __load_log (self, path, prefix="pod: ") :
         log = Log (self.acset)
@@ -241,7 +292,8 @@ class Pod :
 
     def __load_indep (self, prefix="pod: ") :
 
-        # the file stores a dependency relation, we load it
+        # load the file arg_depen_path into a Depen object, we share the
+        # same ActionSet than all the three logs
         dep = Depen (self.acset)
         try :
             print "%sloading file '%s'" % (prefix, self.arg_depen_path)
@@ -273,86 +325,95 @@ class Pod :
         self.indep = Indep ()
         self.indep.from_depen (dep)
 
-    def __assert_merge_pre (self, unf, me) :
+    def __merge (self) :
 
-        # has a bottom event
-        # it is the unflding in the me
-        assert (len (unf.events[0].pre) == 0)
-        assert (unf == me.enc.unf)
+        # construir el encoding
+        # pasarselo a z3
+        # construir la equivalencia
+        # fusionar
 
-        # inverse labelling is good
-        m = unf.new_mark ()
-        for a in unf.net.trans :
-            assert (len (a.inverse_label) >= 1)
-            for e in a.inverse_label :
-                assert (e.m != m)
-                e.m = m
+        print "pod: merge: folding the BP into a net"
+        print "pod: merge: folding: using equivalence '%s'" % self.arg_eq
+
+        # selecting the folding equivalence
+        domain = set (self.bp.events) | set (self.bp.conds)
+        if self.arg_eq == "id" :
+            meq = IdentityMergingEquivalence (domain)
+        elif self.arg_eq == "sp-all" :
+            # FIXME
+            meq = IdentityMergingEquivalence (domain)
+        else :
+            raise AssertionError, "Internal inconsistency"
+
+        # the merge equivalence is meq, folding the BP into a net
+        self.meq = meq
+        (net, e2t, c2p) = self.__apply_merging_eq ()
+        print "pod: merge: folding: done, %d transitions, %d places" \
+                % (len (net.trans), len (net.places))
+
+    def __assert_merge_pre (self, unf, meq) :
+
+        # all events have non-empty preset
         for e in unf.events :
-            assert (e.m == m)
+            assert (len (e.pre))
 
-    def __assert_merge_post (self, unf, me, e2t, c2p) :
+    def __assert_merge_post (self, unf, meq, e2t, c2p) :
 
         assert (len (e2t) == len (unf.events))
         assert (len (c2p) == len (unf.conds))
 
+        # if two events were merged, then the two sets of equivalence
+        # classes for conditions in their presets are the same
         for e,t in e2t.items () :
             for ee in e2t :
                 if e2t[ee] == t :
-                    assert (me.are_merged (e, ee))
-                    self.__assert_merge_subset (me, e, ee)
-                    self.__assert_merge_subset (me, ee, e)
+                    assert (meq.are_merged (e, ee))
+                    self.__assert_merge_subset (meq, e, ee)
+                    self.__assert_merge_subset (meq, ee, e)
+
+        # if two conditions gave the same place, then they were equivalence
+        # ...
         for c,p in c2p.items () :
             for cc in c2p :
                 if c2p[cc] == p :
-                    assert (me.are_merged (c, cc))
-    
-    def __assert_merge_subset (self, me, e, ee) :
+                    assert (meq.are_merged (c, cc))
+
+    def __assert_merge_subset (self, meq, e, ee) :
         # all events in preset and postset of e are merged with at least
         # one of ee
         for x,y in [(e.pre, ee.pre), (e.post, ee.post)] :
             for c in x :
-                assert (any (map (lambda cc : me.are_merged (c, cc), y)))
+                assert (any (map (lambda cc : meq.are_merged (c, cc), y)))
 
-    def merge (self, unf, me) :
-        self.__assert_merge_pre (unf, me)
+    def __apply_merging_eq (self) :
+        # this function does the actual marging of unf, using the merging
+        # equivalence me, and returns the resulting ptnet.Net
+        unf = self.bp
+        meq = self.meq
+        self.__assert_merge_pre (unf, meq)
         net = ptnet.Net (True)
 
         # merge events
         e2t = {}
         c2p = {}
-        for a in unf.net.trans :
-            d = {}
-            for e in a.inverse_label :
-                found = False
-                for ee in d :
-                    if me.are_merged (e, ee) :
-                        d[ee].add (e)
-                        found = True
-                        break
-                if not found :
-                    d[e] = set ([e])
-            print "pod: merging: label", repr (a), "result:", d.values ()
-            for e,evs in d.items () :
-                t = net.trans_add (repr ((a, evs)))
-                for ee in evs : e2t[ee] = t
+        for eqclass in meq.classes () :
+            assert (len (eqclass) >= 1)
+            e = next (iter (eqclass))
+            if not isinstance (e, ptnet.Event) : continue
+            print "pod: merging: ac %s evs %s" % (e.label, list (eqclass))
+            t = net.trans_add (e.label)
+            for e in eqclass : e2t[e] = t
 
         # merge conditions
-        d = {}
-        for c in unf.conds :
-            found = False
-            for cc in d :
-                if me.are_merged (c, cc) :
-                    d[cc].add (c)
-                    found = True
-                    break
-            if not found :
-                d[c] = set ([c])
-        print "pod: merging: conditions:", d.values ()
-        for c,conds in d.items () :
-            p = net.place_add (repr (conds))
-            for c in conds : c2p[c] = p
+        for eqclass in meq.classes () :
+            assert (len (eqclass) >= 1)
+            c = next (iter (eqclass))
+            if not isinstance (c, ptnet.Condition) : continue
+            print "pod: merging: conds %s" % list (eqclass)
+            p = net.place_add (repr (eqclass))
+            for c in eqclass : c2p[c] = p
 
-        self.__assert_merge_post (unf, me, e2t, c2p)
+        self.__assert_merge_post (unf, meq, e2t, c2p)
 
         # build flow
         for e in e2t :
@@ -362,22 +423,23 @@ class Pod :
                 e2t[e].post_add (c2p[c])
 
         # build initial marking
-        for c in unf.events[0].post :
+        for c in unf.m0 :
             net.m0[c2p[c]] = 1
 
-        return net
+        self.net = net
+        return (net, e2t, c2p)
 
     def pes_to_bp (self, es, indep) :
         unf = ptnet.Unfolding ()
 
         # generate the events of the unfolding
         ev_tab = self.__pes_to_bp_gen_events (es, unf)
-        print 'ev_tab', ev_tab
+        #print 'ev_tab', ev_tab
 
         # search for the cliques in the conflict relation and make a table
         cfl_tab = self.__pes_to_bp_build_conflict_table (es)
         cfl_tab = self.__pes_to_bp_conflict_table_pick_single (es, cfl_tab)
-        print 'cfl_tab', cfl_tab
+        #print 'cfl_tab', cfl_tab
 
         # generate one condition and related causalities for every clique 
         pre_tab = self.__pes_to_bp_gen_conds_cfl (es, unf, cfl_tab, ev_tab)
@@ -418,6 +480,7 @@ class Pod :
             local_configs = [es.get_local_config (e) for e in clique]
             c = reduce (lambda c1, c2 : c1.intersect_with (c2), local_configs)
             tup = (tuple (c.maximal ()), tuple (clique))
+            #print "pod: pes > bp: cfl clique %s maxevs %s" % (clique, c.maximal ())
             for e in clique :
                 tab[e] = tup
         return tab
@@ -425,6 +488,9 @@ class Pod :
     def __pes_to_bp_conflict_table_pick_single (self, es, cfl_tab) :
         tab = {}
         for (maxevs, clique) in cfl_tab.values () :
+            if len (maxevs) >= 2 :
+                print "pod: pes > bp: cfl clique %s pick %s" % \
+                        (clique, maxevs)
             e = maxevs[0] if len (maxevs) else None
             tup = (e, clique)
             for e in clique :

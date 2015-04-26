@@ -39,4 +39,12 @@ def error_missing_package (exception) :
     import sys
     sys.exit (1)
 
+def avg_iter (it) :
+    s = 0
+    i = 0
+    for x in it :
+        s += x
+        i += 1
+    return float (s) / i
+
 # vi:ts=4:sw=4:et:

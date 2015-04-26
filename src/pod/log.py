@@ -7,7 +7,7 @@ class Action :
         self.name = name
 
     def __repr__ (self) :
-        return self.name
+        return str (self.name)
 
     def __str__ (self) :
         return repr (self)
@@ -26,6 +26,24 @@ class ActionSet :
             a = Action (name)
             self.tab[name] = a
             return a
+
+    def clone (self) :
+        # we duplicate the dictionary self.tab, but not the actions
+        nacs = ActionSet ();
+        nacs.tab = dict (self.tab)
+        return nacs
+
+    def union (self, other) :
+        if id (self) == id (other) : return
+        # we don't do anything complex here, we refuse to unite if there is
+        # a collision in the tables (union of logs should address this by a
+        # substitution of one action for the other, but this should be done
+        # in Log.union, not here)
+        for (k,v) in other.tab.items () :
+            if k in self.tab :
+                raise Exception, "'%s': action in both logs, refusing to unite" % k
+            self.tab[k] = v
+        return self
 
     def __iter__ (self) :
         return iter (self.tab.values ())
@@ -47,7 +65,9 @@ class Event :
         return s + "]"
 
 class Log :
-    def __init__ (self, actionset) :
+    def __init__ (self, actionset=None) :
+        if actionset == None :
+            actionset = ActionSet ()
         self.traces = []
         self.actionset = actionset
 
@@ -73,25 +93,42 @@ class Log :
                 seq.append (e)
             self.traces.append (seq)
 
+    def clone (self) :
+        # we duplicate the actions set (but not the actions, just the set
+        # containing them), and we also duplicate the list self.traces (but
+        # not the sequences contained, nor the events contained in those
+        # sequences)
+        nacs = self.actionset.clone ()
+        l = Log (nacs)
+        l.traces = list (self.traces)
+        return l
+
+    def union (self, other) :
+        if id (self) == id (other) : return
+        self.actionset.union (other.actionset)
+        # the next line will add new slots to self.traces, but will not
+        # duplicate the sequences, nor the events they contain (nor the
+        # actions)
+        self.traces.extend (other.traces)
+        return self
+
     def to_pes (self, indep) :
         es = pes.PES ()
+        i = 0
         for seq in self.traces :
-            self.__trace_to_pes (es, seq, indep)
+            self.__trace_to_pes (es, i, seq, indep)
+            i += 1
         return es
 
-    def __trace_to_pes (self, es, seq, indep) :
+    def __trace_to_pes (self, es, i, seq, indep) :
         c = es.get_empty_config ()
-        print 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        print 'pod: log > pes: seq %d len %d first %s' % \
+                (i, len (seq), seq[:15])
         #print 'pes', es
-        #print 'seq', seq
-        i = 0
+        j = 0
         for logev in seq :
             a = logev.action
             l = [e for e in c.enabled () if e.label == a]
-            print '-------------------------'
-            print 'action', a
-            #print 'configuration', c
-            print 'l', l
             assert (len (l) == 0 or len (l) == 1)
             if l :
                 e = l[0]
@@ -100,11 +137,11 @@ class Log :
                 e = es.add_event (a, max_events)
                 es.set_cfls (e, indep)
                 c.update_enabled_hint (e)
-            print 'firing', e
+                print "pod: log > pes:  %s i %d" % (e, j)
             c.add (e)
-            if i == 0 :
+            if len (e.pre) == 0 :
                 es.update_minimal_hint (e)
-                i += 1
+            j += 1
 
     def extract_indep_from_net (self, net) :
         # FIXME -- remove this, funcitonality is now in
@@ -132,8 +169,12 @@ class Log :
         indep.from_depen (d)
         return indep
 
+    def __repr__ (self) :
+        nre = sum (len (seq) for seq in self.traces)
+        return "id %s, %d traces, %d events, %d actions" % \
+            (id (self), len (self.traces), nre, len (self.actionset))
     def __str__ (self) :
-        return "traces %s actions %s" % (self.traces, self.action_tab.values ())
+        return "traces %s actions %s" % (self.traces, list (self.actionset))
 
 class SymmetricRelation :
     def __init__ (self, domain) :

@@ -123,10 +123,22 @@ OPTIONS:
 --log-exclude=7,23
 --log-negative=PATH
 --output=PATH
+--eq=EQ
+
+where EQ is
+
+id
+  do not merge anything
+sp-all
+  merges all events with same label
+  merges all conditions into 1 single place
+  ignores negative info
+sp-pre
+  merges all events with same label
+  merges presets of all merged events
+  ignores negative info
+
 #--format={pdf,dot,pnml}
 
 
-- modify the Log to operate with an ActionSet
-- modify __load_log to operate with an ActionSet
-x also __load_indep
-x also SymmetricRelation, Depen, Indep
+- test that the sharing of ActionSets works in cmd_merge
