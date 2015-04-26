@@ -13,6 +13,23 @@ And OPTIONS is zero or more of the following options
 
  ...
 
+pod [OPTIONS] extract-dependence    PNML
+pod [OPTIONS] dump-log              LOGFILE
+pod [OPTIONS] dump-pes              LOGFILE INDEPFILE
+pod [OPTIONS] dump-bp               LOGFILE INDEPFILE
+pod [OPTIONS] dump-encoding     LOGFILE INDEPFILE
+pod [OPTIONS] dump-merge            LOGFILE INDEPFILE
+pod [OPTIONS] merge                 LOGFILE INDEPFILE
+
+
+OPTIONS:
+
+--help, -h
+--log-first=n
+--log-only=1,2,4
+--log-exclude=7,23
+--output=PATH
+
 """
 
 try :
@@ -57,7 +74,7 @@ class Pod :
         cmd_choices = ["extract-dependence", "dump-log", "dump-pes",
                 "dump-bp", "dump-encoding", "dump-merge", "merge"]
         #p = argparse.ArgumentParser (usage = __doc__, add_help=False)
-        p = argparse.ArgumentParser ()
+        p = argparse.ArgumentParser (usage=__doc__)
         #p.add_argument ("-h", "--help", action="store_true")
         p.add_argument ("--log-first", type=int)
         p.add_argument ("--log-only")
@@ -99,6 +116,45 @@ class Pod :
 
     def main (self) :
         self.parse_cmdline_args ()
+
+        if self.command == "extract-dependence" :
+            self.cmd_extract_dependence ()
+        elif self.command == "dump-log" :
+            self.cmd_dump_log ()
+        else :
+            raise Exception, "Shit happened!"
+
+    def cmd_extract_dependence (self) :
+
+        # load the net
+        net = load_net (self.log_path, "pnml", "pod: extract: ")
+
+        # create a dependence relation and fill it from the net
+        dep = Depen ()
+        print "pod: extract: extracting dependence relation ..."
+        dep.from_net (net)
+
+        # XXX - hack: ensure that the relation is "positively" stored
+        assert (dep.negate == False)
+        print "pod: extract: done, %d pairs" % len (dep.pairs)
+
+        # warnings
+        s = set ()
+        for t in net.trans :
+            if " " in t.name :
+                print "pod: extract: WARNING: transition '%s' contains spaces in the name" % t.name
+            if t.name in s :
+                print "pod: extract: WARNING: 2 transition with same name '%s'" % t.name
+            s.add (t.name)
+
+        # save
+        f = open (self.output_path, "w")
+        f.write ("# Dependence relation automatically extracted from:\n")
+        f.write ("# %s\n" % self.log_path)
+        for (t1, t2) in dep.pairs :
+            f.write ("%s %s\n" % (t1.name, t2.name))
+        f.close ()
+        print "pod: extract: output saved to '%s'" % self.output_path
 
     def __assert_merge_pre (self, unf, me) :
 
