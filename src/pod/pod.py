@@ -1,5 +1,5 @@
 """
-pod [OPTIONS] COMMAND LOGFILE/PNMLFILE [INDEPFILE]
+pod [OPTIONS] COMMAND LOGFILE/PNMLFILE [DEPENFILE]
 
 Bla bla bla
 
@@ -15,11 +15,11 @@ And OPTIONS is zero or more of the following options
 
 pod [OPTIONS] extract-dependence    PNML
 pod [OPTIONS] dump-log              LOGFILE
-pod [OPTIONS] dump-pes              LOGFILE INDEPFILE
-pod [OPTIONS] dump-bp               LOGFILE INDEPFILE
-pod [OPTIONS] dump-encoding     LOGFILE INDEPFILE
-pod [OPTIONS] dump-merge            LOGFILE INDEPFILE
-pod [OPTIONS] merge                 LOGFILE INDEPFILE
+pod [OPTIONS] dump-pes              LOGFILE DEPENFILE
+pod [OPTIONS] dump-bp               LOGFILE DEPENFILE
+pod [OPTIONS] dump-encoding         LOGFILE DEPENFILE
+pod [OPTIONS] dump-merge            LOGFILE DEPENFILE
+pod [OPTIONS] merge                 LOGFILE DEPENFILE
 
 
 OPTIONS:
@@ -41,13 +41,14 @@ try :
 
     from util import *
     from log import *
-    from merging import *
+    from folding import *
+    from equivalence import *
 
     import z3
     import ptnet
     import pes
 except ImportError, e:
-    util.error_missing_package (e)
+    error_missing_package (e)
 
 if sys.version_info < (2, 7, 0) or sys.version_info >= (3, 0, 0) :
     print ("")
@@ -62,7 +63,7 @@ class Pod :
 
         self.arg_command = ""
         self.arg_log_path = ""
-        self.arg_indep_path = ""
+        self.arg_depen_path = ""
 
         self.arg_log_first = -1
         self.arg_log_only = []
@@ -70,6 +71,7 @@ class Pod :
         self.arg_log_negative = ""
         self.arg_output_path = ""
 
+        self.acset = None
         self.log = None
         self.log_negative = None
         self.indep = None
@@ -90,7 +92,7 @@ class Pod :
 
         p.add_argument ('cmd', metavar="COMMAND", choices=cmd_choices)
         p.add_argument ('log_pnml', metavar="LOGFILE/PNML")
-        p.add_argument ('indep', metavar="INDEPFILE", nargs="?", default=None)
+        p.add_argument ('depen', metavar="DEPENFILE", nargs="?", default=None)
 
         args = p.parse_args ()
         print "pod: args:", args
@@ -100,10 +102,14 @@ class Pod :
         #    sys.exit (0);
 
         self.arg_command = args.cmd
-        self.arg_indep_path = args.indep
+        self.arg_depen_path = args.depen
         self.arg_log_path = args.log_pnml
         self.arg_log_first = args.log_first
         self.arg_log_negative = args.log_negative
+
+        if self.arg_command not in ["extract-dependence", "dump-log"] :
+            if self.arg_depen_path == None :
+                raise Exception, "Expected path to a dependence file"
 
         if args.log_only != None :
             try :
@@ -128,7 +134,7 @@ class Pod :
             self.arg_output_path = d.get (self.arg_command, "output.txt")
         for opt in [
                     "arg_command",
-                    "arg_indep_path",
+                    "arg_depen_path",
                     "arg_log_path",
                     "arg_log_first",
                     "arg_log_only",
@@ -145,6 +151,8 @@ class Pod :
             self.cmd_extract_dependence ()
         elif self.arg_command == "dump-log" :
             self.cmd_dump_log ()
+        elif self.arg_command == "merge" :
+            self.cmd_merge ()
         else :
             raise Exception, "Shit happened!"
 
@@ -156,11 +164,12 @@ class Pod :
         # create a dependence relation and fill it from the net
         dep = Depen ()
         print "pod: extract: extracting dependence relation ..."
-        dep.from_net (net)
+        dep.from_net_names (net)
 
         # XXX - hack: ensure that the relation is "positively" stored
         assert (dep.negate == False)
-        print "pod: extract: done, %d pairs" % len (dep.pairs)
+        print "pod: extract: done, %d different actions, %d pairs" \
+                % (len (dep.domain), len (dep.pairs))
 
         # warnings
         s = set ()
@@ -168,41 +177,45 @@ class Pod :
             if " " in t.name :
                 print "pod: extract: WARNING: transition '%s' contains spaces in the name" % t.name
             if t.name in s :
-                print "pod: extract: WARNING: 2 transition with same name '%s'" % t.name
+                print "pod: extract: WARNING: 2 transition with same name: '%s'" % t.name
             s.add (t.name)
 
         # save
         try :
             f = open (self.arg_output_path, "w")
+            f.write ("# Dependence relation on transition names, automatically extracted from:\n")
+            f.write ("# %s\n" % self.arg_log_path)
+            for (a1, a2) in dep.pairs :
+                f.write ("%s %s\n" % (a1.name, a2.name))
+            f.close ()
         except Exception as (e, m) :
             raise Exception, "'%s': %s" % (self.arg_output_path, m)
-        f.write ("# Dependence relation automatically extracted from:\n")
-        f.write ("# %s\n" % self.arg_log_path)
-        for (t1, t2) in dep.pairs :
-            f.write ("%s %s\n" % (t1.name, t2.name))
-        f.close ()
         print "pod: extract: output saved to '%s'" % self.arg_output_path
 
     def cmd_dump_log (self) :
-        pass
+        raise NotImplementedError
 
     def cmd_merge (self) :
+
+        # create a new action set
+        self.acset = ActionSet ()
 
         # load logs
         print "pod: merge: loading log with positive information"
         self.log = self.__load_log (self.arg_log_path, \
-                "pod: merge: positive")
+                "pod: merge: positive: ")
 
         if self.arg_log_negative != None :
             print "pod: merge: loading log with negative information"
             self.log_negative = self.__load_log (self.arg_log_negative, \
-                    "pod: merge: negative")
+                    "pod: merge: negative: ")
 
         # load the independence relation
-        self.__load_indep ()
+        self.__load_indep ("pod: merge: independence: ")
 
         # build the PES
-        es = self.log.to_pes (indep)
+        return
+        es = self.log.to_pes (self.indep)
 
         # build the BP
         # construir el encoding
@@ -211,8 +224,8 @@ class Pod :
         # fusionar
         # guardar el resultado
 
-    def __laod_log (self, path, prefix="pod: ") :
-        log = Log ()
+    def __load_log (self, path, prefix="pod: ") :
+        log = Log (self.acset)
         try :
             size = os.path.getsize (path) / (1024 * 1024.0)
             print "%sloading log file '%s' (%.1fM), assuming XES format" % (prefix, path, size)
@@ -221,15 +234,18 @@ class Pod :
             f.close ()
         except Exception as (e, m) :
             raise Exception, "'%s': %s" % (path, m)
+        nre = sum (len (seq) for seq in log.traces)
         print '%sdone, %d logs, %d log events, %d distinct actions' \
-                % (prefix, len (self.traces), nre, len (self.action_tab))
+                % (prefix, len (log.traces), nre, len (self.acset))
         return log
 
-    def __load_indep (self, path, acset, prefix="pod: ") :
-        dep = Depen (acset)
+    def __load_indep (self, prefix="pod: ") :
+
+        # the file stores a dependency relation, we load it
+        dep = Depen (self.acset)
         try :
-            print "%sloading dependence relation '%s'" % (prefix, path)
-            f = open (self.arg_indep_path, 'r')
+            print "%sloading file '%s'" % (prefix, self.arg_depen_path)
+            f = open (self.arg_depen_path, 'r')
             i = 0
             for line in f :
                 i += 1
@@ -238,22 +254,24 @@ class Pod :
                 if line[0] == '#' : continue
                 ls = line.split ()
                 if len (ls) != 2 :
-                    raise Exception, "line %d: expected two words"
-                a1 = acset.lookup (ls[0])
+                    raise Exception, "line %d: expected two words separated by spaces"
+                a1 = self.acset.lookup (ls[0])
                 if a1 == None :
                     print "%sline %d: NOTICE: new action '%s' not happening in the logs" % (prefix, i, ls[0])
-                    a1 = acset.lookup_or_create (ls[0])
-                a2 = acset.lookup (ls[1])
+                    a1 = self.acset.lookup_or_create (ls[0])
+                a2 = self.acset.lookup (ls[1])
                 if a2 == None :
                     print "%sline %d: NOTICE: new action '%s' not happening in the logs" % (prefix, i, ls[1])
-                    a2 = acset.lookup_or_create (ls[1])
+                    a2 = self.acset.lookup_or_create (ls[1])
                 dep.set (a1, a2)
             f.close ()
         except Exception as (e, m) :
-            raise Exception, "'%s': %s" % (self.arg_indep_path, m)
-        print '%sdone, %d pairs, %d distinct actions known' \
-                % (prefix, len (dep), len (acset))
-        return log
+            raise Exception, "'%s': %s" % (self.arg_depen_path, m)
+        print '%sdone, %d pairs, %d distinct actions now known' \
+                % (prefix, len (dep), len (self.acset))
+
+        self.indep = Indep ()
+        self.indep.from_depen (dep)
 
     def __assert_merge_pre (self, unf, me) :
 
@@ -293,8 +311,7 @@ class Pod :
         # one of ee
         for x,y in [(e.pre, ee.pre), (e.post, ee.post)] :
             for c in x :
-                assert (reduce (lambda a, b : a or b, \
-                        map (lambda cc : me.are_merged (c, cc), y)))
+                assert (any (map (lambda cc : me.are_merged (c, cc), y)))
 
     def merge (self, unf, me) :
         self.__assert_merge_pre (unf, me)
@@ -314,12 +331,12 @@ class Pod :
                         break
                 if not found :
                     d[e] = set ([e])
-            print "podisc: merging: label", repr (a), "result:", d.values ()
+            print "pod: merging: label", repr (a), "result:", d.values ()
             for e,evs in d.items () :
                 t = net.trans_add (repr ((a, evs)))
                 for ee in evs : e2t[ee] = t
 
-        # merge transitions
+        # merge conditions
         d = {}
         for c in unf.conds :
             found = False
@@ -330,7 +347,7 @@ class Pod :
                     break
             if not found :
                 d[c] = set ([c])
-        print "podisc: merging: conditions:", d.values ()
+        print "pod: merging: conditions:", d.values ()
         for c,conds in d.items () :
             p = net.place_add (repr (conds))
             for c in conds : c2p[c] = p

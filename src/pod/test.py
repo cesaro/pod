@@ -12,7 +12,7 @@ import z3
 
 from util import *
 from log import *
-from merging import *
+from folding import *
 from pod import *
 
 def test1 () :

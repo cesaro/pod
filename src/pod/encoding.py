@@ -1,91 +1,9 @@
 
-import math
-import time
-
 import sat
 import ptnet
 import z3
 
-from util import *
-
-def sgl (s) :
-    return (list (s))[0]
-
-
-class MergingEquivalence :
-    def are_merged (self, x, y) :
-        return False
-
-class Smt2MergingEquivalence (MergingEquivalence) :
-    def __init__ (self, enc) :
-        self.enc = enc
-        self.model = enc.z3.model ()
-
-    def are_merged (self, x, y) :
-        if isinstance (x, ptnet.unfolding.Condition) :
-            assert (isinstance (y, ptnet.unfolding.Condition))
-
-            vx = self.enc.smt_varmap (x)
-            vy = self.enc.smt_varmap (y)
-
-            # if we didn't generate variable for one of them
-            # then it is surely possible to have one that
-            # has the same value as the other, ie, we merge
-            if (vx == None or vy == None) : return True
-
-            return self.model[vx].as_long () == self.model[vy].as_long ()
-
-        else :
-            assert (isinstance (x, ptnet.unfolding.Event))
-            assert (isinstance (y, ptnet.unfolding.Event))
-
-            if x.label != y.label : return False
-            vx = self.enc.smt_varmap (x)
-            vy = self.enc.smt_varmap (y)
-            assert (vx != None)
-            assert (vy != None)
-            return self.model[vx].as_long () == self.model[vy].as_long ()
-
-    def __str__ (self) :
-        return str (self.model)
-
-class EquivalenceSolver :
-    def __init__ (self, unfolding, smt_or_sat = 'SMT_2') :
-        assert (smt_or_sat in ['SMT_1', 'SMT_2', 'SAT'])
-        self.unf = unfolding
-        self.enc = EquivalenceEncoding (unfolding)
-        self.smt_or_sat = smt_or_sat
-
-    def find_best (self) :
-        # does the binary search
-        pass
-
-    def find_with_measure (self, k, timeout = 10 * 1000) :
-        # returns an equivalence, or None
-        
-        if self.smt_or_sat == 'SMT_2' :
-            print "podisc: solver: building SMT_2 encoding"
-            self.enc.smt_encode_2 (k)
-            print "podisc: solver: z3: calling, timeout=%ds ..." % (timeout / 1000)
-            self.enc.z3.set ("timeout", timeout)
-            tstart = time.time ()
-            result = self.enc.z3.check ()
-            tend = time.time ()
-            print "podisc: solver: z3: done, %.2fs, %s" % (tend - tstart, result)
-            print_stats (sys.stdout, self.enc.stats (), "podisc: solver: z3: ")
-            if result == z3.sat :
-                return Smt2MergingEquivalence (self.enc)
-            elif result == z3.unsat :
-                return None
-            else :
-                print "podisc: solver: answer: unknown"
-                return None
-        elif smt_or_sat == 'SMT_1' :
-            return None # fixme
-        else :
-            return None # fixme
-
-class EquivalenceEncoding :
+class SmtEquivalenceEncoding :
     def __init__ (self, unfolding) :
         self.unf = unfolding
         self.satf = None

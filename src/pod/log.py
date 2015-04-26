@@ -28,9 +28,10 @@ class ActionSet :
             return a
 
     def __iter__ (self) :
-        iter (self.tab.values ())
+        return iter (self.tab.values ())
+
     def __len__ (self) :
-        len (self.tab)
+        return len (self.tab)
 
 class Event :
     def __init__ (self, action, attr) :
@@ -46,17 +47,9 @@ class Event :
         return s + "]"
 
 class Log :
-    def __init__ (self) :
+    def __init__ (self, actionset) :
         self.traces = []
-        self.action_tab = {}
-
-    def find_or_create_action (self, name) :
-        try :
-            return self.action_tab[name]
-        except KeyError :
-            a = Action (name)
-            self.action_tab[name] = a
-            return a
+        self.actionset = actionset
 
     def read (self, f, fmt='xes') :
         if isinstance (f, basestring) : f = open (f, 'r')
@@ -67,8 +60,6 @@ class Log :
         tree = xml.etree.ElementTree.parse (f)
         root = tree.getroot()
         xmltraces = root.findall('{http://www.xes-standard.org/}trace')
-        uniq_cases = {}
-        nre = 0
         for trace in xmltraces:
             seq = []
             for xmlev in trace:
@@ -76,12 +67,11 @@ class Log :
                 d = {s.attrib['key'] : s.attrib['value'] for s in xmlev}
                 if 'concept:name' not in d :
                     raise Exception, 'XES file has one event with no "concept:name" key'
-                a = self.find_or_create_action (d['concept:name'])
+                a = self.actionset.lookup_or_create (d['concept:name'])
                 del d['concept:name']
                 e = Event (a, d)
                 seq.append (e)
             self.traces.append (seq)
-            nre += len (seq)
 
     def to_pes (self, indep) :
         es = pes.PES ()
@@ -117,6 +107,9 @@ class Log :
                 i += 1
 
     def extract_indep_from_net (self, net) :
+        # FIXME -- remove this, funcitonality is now in
+        # Depen.from_net_names
+
         # XXX - this method assumes that the net contains exactly one
         # transition whose name equals the action's name, for every action
         # occurring in the log
@@ -148,21 +141,28 @@ class SymmetricRelation :
         self.negate = False
         self.domain = domain
 
-    def set (self, t1, t2) :
-        if id (t1) < id (t2) :
-            self.pairs.add ((t1, t2))
-        else :
-            self.pairs.add ((t2, t1))
+    def __is_in_domain (self, it) :
+        for x in it :
+            if x not in self.domain :
+                raise LookupError, "'%s' is not in the domain" % repr (x)
 
-    def get (self, t1, t2) :
-        if id (t1) < id (t2) :
-            r = (t1, t2) in self.pairs
+    def set (self, x, y) :
+        self.__is_in_domain ([x, y])
+        if id (x) < id (y) :
+            self.pairs.add ((x, y))
         else :
-            r = (t2, t1) in self.pairs
+            self.pairs.add ((y, x))
+
+    def get (self, x, y) :
+        self.__is_in_domain ([x, y])
+        if id (x) < id (y) :
+            r = (x, y) in self.pairs
+        else :
+            r = (y, x) in self.pairs
         return not r if self.negate else r
 
-    def __getitem__ (self, (t1, t2)) :
-        return self.get (t1, t2)
+    def __getitem__ (self, (x, y)) :
+        return self.get (x, y)
 
     def __iter__ (self) :
         return iter (self.pairs)
@@ -170,12 +170,17 @@ class SymmetricRelation :
         return len (self.pairs)
 
     def __repr__ (self) :
-        return "%d pairs tab %s negate %s" % (len (self.pairs), list (self.pairs), 'yes' if self.negate else 'no')
+        return "domain %d pairs %d tab %s negate %s" \
+                % (len (self.domain), len (self.pairs),
+                list (self.pairs),
+                'yes' if self.negate else 'no')
     def __str__ (self) :
         return repr (self)
 
 class Indep (SymmetricRelation) :
-    def __init__ (self, domain) :
+    def __init__ (self, domain=None) :
+        if domain == None :
+            domain = ActionSet ()
         SymmetricRelation.__init__ (self, domain)
 
     def from_indep (self, indep) :
@@ -194,19 +199,26 @@ class Indep (SymmetricRelation) :
             if self.get (x, x) :
                 raise Exception, "Not irreflexive: has pair (%s, %s)" % (repr (x), repr (x))
 
-    def from_net (self, n, action_set=None) :
-        d = Depen (action_set, action_set)
-        d.from_net (n)
+    def from_net_transitions (self, net) :
+        d = Depen (self.domain)
+        d.from_net_transitions (net)
         self.from_depen (d)
 
-    def __repr__ (self) :
-        return SymmetricRelation.__repr__ (self)
-    def __str__ (self) :
-        return SymmetricRelation.__str__ (self)
+    def from_net_names (self, net) :
+        d = Depen (self.domain)
+        d.from_net_names (net)
+        self.from_depen (d)
+
+    def from_list (self, l) :
+        d = Depen (self.domain)
+        d.from_file (l)
+        self.from_depen (d)
 
 class Depen (SymmetricRelation) :
-    def __init__ (self) :
-        SymmetricRelation.__init__ (self)
+    def __init__ (self, domain=None) :
+        if domain == None :
+            domain = ActionSet ()
+        SymmetricRelation.__init__ (self, domain)
 
     def from_indep (self, indep) :
         self.pairs = indep.pairs
@@ -222,23 +234,47 @@ class Depen (SymmetricRelation) :
         # it is symmetric by construction, check it is reflexive
         for x in self.domain :
             if not self.get (x, x) :
-                raise Exception, "Not reflexive: missing pair (%s, %s)" % (repr (x), repr (x))
+                raise Exception, "Not reflexive: missing pair (%s, %s)" \
+                        % (repr (x), repr (x))
 
-    def from_net (self, n, action_set=None) :
-        if action_set == None :
-            action_set = Actionset ()
-        for t in n.trans : action_set.lookup_or_create (t.name)
-        d = Depen (action_set)
-        for p in n.places :
+    def from_net_transitions (self, net) :
+        # fill the domain (an ActionSet) with all transitions, creating one
+        # new Action for every transition (should this be here??)
+        for t in net.trans :
+            a = self.domain.lookup_or_create (t)
+            self.set (a, a)
+        # transitions with non-disjunct preset and postset
+        for p in net.places :
             for t1 in p.post | p.pre :
                 for t2 in p.post | p.pre :
-                    d.set (t1, t2)
-        self.from_depen (d)
+                    a1 = self.domain.lookup (t1)
+                    a2 = self.domain.lookup (t2)
+                    self.set (a1, a2)
 
-    def __repr__ (self) :
-        return SymmetricRelation.__repr__ (self)
-    def __str__ (self) :
-        return SymmetricRelation.__str__ (self)
+    def from_net_names (self, net) :
+        # fill the domain (an ActionSet) with one Action for every name in
+        # the net (there could be less names than transitions, or not)
+        for t in net.trans :
+            a = self.domain.lookup_or_create (t.name)
+            self.set (a, a)
+        # same as before but with the names; this means that two names will
+        # be declared dependent iff there exists two transitions, resp.
+        # labelled by them, that are dependent (in the non-disjoint-context
+        # sense); unfolding the net with (the projection of this relation
+        # on transitions, ie, t1 t2 dependentn iff their labels so are)
+        # is safe, ie, the projection is a valid dependence relation
+        for p in net.places :
+            for t1 in p.post | p.pre :
+                for t2 in p.post | p.pre :
+                    a1 = self.domain.lookup (t1.name)
+                    a2 = self.domain.lookup (t2.name)
+                    self.set (a1, a2)
+
+    def from_list (self, l) :
+        for (x1, x2) in l :
+            a1 = self.domain.lookup_or_create (x1)
+            a2 = self.domain.lookup_or_create (x2)
+            self.set (a1, a2)
 
 def log_from_xes(filename, all_info=False, only_uniq_cases=True):
     """Load a log in the XES format.
