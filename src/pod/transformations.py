@@ -23,8 +23,8 @@ def log_to_pes (log, indep) :
 
 def __seq_to_pes (es, i, seq, indep) :
     if i < 10 :
-        print 'pod: log > pes: seq %d len %d first %s' % \
-                (i, len (seq), seq[:15])
+        print 'pod: log > pes: seq %d len %d %s' % \
+                (i, len (seq), long_list (seq, 10))
     elif i == 10 :
         print 'pod: log > pes: ... skipping debug info for remaining log sequences'
     c = es.get_empty_config ()
@@ -74,14 +74,21 @@ def pes_to_bp (es, indep) :
     return unf
 
 def __pes_to_bp_gen_events (es, unf) :
+    # translate all events, collect an action set and store it in
+    # unf.net.trans (this is hack, but should work), and do the inverse
+    # labellig
     ev_tab = {}
     action_set = set ()
     for e in es.events :
-        action_set.add (e.label)
         unfe = unf.event_add (e.label)
         ev_tab[e] = unfe
 
-    # XXX - this is somehow a hack, but it will hopefully work
+        if e.label not in action_set :
+            action_set.add (e.label)
+            e.label.inverse_label = set ([unfe])
+        else :
+            e.label.inverse_label.add (unfe)
+
     unf.net.trans = list (action_set)
     return ev_tab
 
@@ -178,6 +185,7 @@ def bp_to_net (unf, meq) :
     c2p = {}
 
     # merge events
+    print 'pod: bp > net: folding events:'
     single_t = 0
     for eqclass in meq.classes () :
         assert (len (eqclass) >= 1)
@@ -188,29 +196,32 @@ def bp_to_net (unf, meq) :
         if len (eqclass) == 1 :
             single_t += 1
         else :
-            print "pod: bp > net: ac %s evs %s" % (t.name, list (eqclass))
+            print "pod: bp > net: * ac %s %d events %s" % \
+                    (t.name, len (eqclass), long_list (eqclass, 10))
     
 
     # merge conditions
+    print 'pod: bp > net: folding conditions:'
+    single_t = 0
     single_p = 0
     for eqclass in meq.classes () :
         assert (len (eqclass) >= 1)
         c = next (iter (eqclass))
         if not isinstance (c, ptnet.Condition) : continue
-        p = net.place_add (repr (eqclass))
+        p = net.place_add (long_list (eqclass, 5))
         for c in eqclass : c2p[c] = p
         if len (eqclass) == 1 :
             single_p += 1
         else :
-            print "pod: bp > net: conds %s" % list (eqclass)
+            print "pod: bp > net: * %d conds %s" % \
+                    (len (eqclass), long_list (eqclass, 10))
     print "pod: bp > net: transitions: %d singleton classes, %d non-singleton" % \
             (single_t, len (net.trans) - single_t)
     print "pod: bp > net: places: %d singleton classes, %d non-singleton" % \
             (single_p, len (net.places) - single_p)
 
-    __bp_to_net_assert_post (unf, meq, e2t, c2p)
-
     # build flow
+    print 'pod: bp > net: folding flow relation'
     for e in e2t :
         for c in e.pre :
             e2t[e].pre_add (c2p[c])
@@ -220,6 +231,9 @@ def bp_to_net (unf, meq) :
     # build initial marking
     for c in unf.m0 :
         net.m0[c2p[c]] = 1
+
+    print 'pod: bp > net: verifying transformations...'
+    __bp_to_net_assert_post (unf, meq, e2t, c2p)
 
     print "pod: bp > net: done, %d transitions, %d places" \
             % (len (net.trans), len (net.places))

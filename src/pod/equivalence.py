@@ -10,17 +10,17 @@ class MergingEquivalence :
     def __init__ (self, domain) :
         self.domain = domain
 
-    def __is_in_domain (self, it) :
+    def is_in_domain (self, it) :
         for x in it :
             if x not in self.domain :
                 raise LookupError, "'%s' is not in the domain" % repr (x)
 
     def are_merged (self, x, y) :
-        self.__is_in_domain ([x, y])
+        self.is_in_domain ([x, y])
         return x == y
 
     def class_of (self, x) :
-        self.__is_in_domain ([x])
+        self.is_in_domain ([x])
         return [x]
 
     def classes (self) :
@@ -38,7 +38,7 @@ class Smt2MergingEquivalence (MergingEquivalence) :
         self.model = enc.z3.model ()
 
     def are_merged (self, x, y) :
-        self.__is_in_domain ([x, y])
+        self.is_in_domain ([x, y])
         if isinstance (x, ptnet.Condition) :
             assert (isinstance (y, ptnet.Condition))
 
@@ -77,7 +77,7 @@ class ComputedMergingEquivalence (MergingEquivalence) :
         self.class_by_member = {}
 
     def set_class (self, x, class_id) :
-        self.__is_in_domain ([x])
+        self.is_in_domain ([x])
         if class_id in self.class_by_id :
             self.class_by_id[class_id].add (x)
         else :
@@ -87,18 +87,18 @@ class ComputedMergingEquivalence (MergingEquivalence) :
         
     def are_merged (self, x, y) :
         if x == y : return True
-        self.__is_in_domain ([x, y])
+        self.is_in_domain ([x, y])
         return self.class_by_member[x] == self.class_by_member[y]
 
     def class_of (self, x) :
-        self.__is_in_domain ([x])
+        self.is_in_domain ([x])
         if x not in self.class_by_member :
             raise LookupError, \
                 "'%s': unknown equivalence class" % repr (x)
         return self.class_by_member[x]
 
     def classes (self) :
-        raise self.class_by_member.values ()
+        return self.class_by_id.values ()
 
 class IdentityMergingEquivalence (MergingEquivalence) :
     pass

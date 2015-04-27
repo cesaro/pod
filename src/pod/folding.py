@@ -151,5 +151,24 @@ class SmtEquivalenceFinder :
         self.net = net
         return net
 
+class SpMergingEquivalenceFactory :
+    @staticmethod
+    def one_place (unf) :
+
+        # merges all events with same label
+        # merges all conditions into 1 single place
+        # ignores negative info
+
+        domain = set (unf.events) | set (unf.conds)
+        meq = ComputedMergingEquivalence (domain)
+        i = 0
+        for a in unf.net.trans :
+            for e in a.inverse_label :
+                meq.set_class (e, i)
+            i += 1
+        for c in unf.conds :
+            meq.set_class (c, i)
+
+        return meq
 
 # vi:ts=4:sw=4:et:

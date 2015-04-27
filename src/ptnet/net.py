@@ -1055,7 +1055,7 @@ class Net :
             self.__pnmlitm['weight'] = ''
 
         # bug if inscription is an arc weight !!!!
-        elif tag in ['toolspecific', 'graphics'] :
+        elif tag in ['toolspecific', 'graphics', 'arctype'] :
             self.__pnmlskipdepth = self.__pnmldepth
             return
         elif tag in ['page', 'pnml', 'text'] :

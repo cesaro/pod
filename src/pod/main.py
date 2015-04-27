@@ -294,7 +294,7 @@ class Main :
         # same ActionSet than all the three logs
         dep = Depen (self.acset)
         try :
-            print "pod: loading file '%s'" % self.arg_depen_path
+            print "pod: loading dependence from file '%s'" % self.arg_depen_path
             f = open (self.arg_depen_path, 'r')
             i = 0
             for line in f :
@@ -320,6 +320,14 @@ class Main :
         print 'pod: done, %d pairs, %d distinct actions now known' \
                 % (len (dep), len (self.acset))
 
+        print 'pod: validating reflexivity'
+        try :
+            dep.check_is_dependence ()
+        except Exception as e:
+            print 'pod: ERROR: %s' % e
+            print "pod: are you sure '%s' is a dependence relation for '%s'?" \
+                    % (self.arg_depen_path, self.arg_log_path)
+            raise e
         self.indep = Indep ()
         self.indep.from_depen (dep)
 
@@ -334,12 +342,11 @@ class Main :
         print "pod: bp > net: using equivalence '%s'" % self.arg_eq
 
         # selecting the folding equivalence
-        domain = set (self.bp.events) | set (self.bp.conds)
         if self.arg_eq == "id" :
+            domain = set (self.bp.events) | set (self.bp.conds)
             self.meq = IdentityMergingEquivalence (domain)
         elif self.arg_eq == "sp-all" :
-            # FIXME
-            self.meq = IdentityMergingEquivalence (domain)
+            self.meq = SpMergingEquivalenceFactory.one_place (self.bp)
         else :
             raise AssertionError, "Internal inconsistency"
 

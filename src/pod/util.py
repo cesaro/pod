@@ -21,8 +21,8 @@ def load_net (path, fmt="pnml", prefix="pod: ") :
         f = open (path, 'r')
         net.read (f, fmt=fmt)
         f.close ()
-    except Exception as (e, m) :
-        raise Exception, "'%s': %s" % (path, m)
+    except Exception as e :
+        raise Exception, "'%s': %s" % (path, e)
     print "%sdone, %d transitions, %d places" % (prefix, len (net.trans), len (net.places))
     print "%sfirst 5 transitions are:" % prefix
     for t in net.trans[:5] :
@@ -46,5 +46,16 @@ def avg_iter (it) :
         s += x
         i += 1
     return float (s) / i
+
+def long_list (ls, maxlen=5) :
+    ls = list (ls)
+    le = len (ls)
+    s = "["
+    s += ", ".join (repr (x) for x in ls[:maxlen])
+    if le > maxlen :
+        s += ", ... %d more]" % (le - maxlen)
+    else :
+        s += "]"
+    return s
 
 # vi:ts=4:sw=4:et:
