@@ -27,6 +27,10 @@ class ActionSet :
             self.tab[name] = a
             return a
 
+    def remove (self, action) :
+        assert (action.name in self.tab)
+        del self.tab[action.name]
+
     def clone (self) :
         # we duplicate the dictionary self.tab, but not the actions
         nacs = ActionSet ();
@@ -70,6 +74,14 @@ class Log :
             actionset = ActionSet ()
         self.traces = []
         self.actionset = actionset
+
+    def truncate (self, nr) :
+        self.traces = self.traces[:nr]
+        seen = set ()
+        for seq in self.traces :
+            seen.update (set (e.action for e in seq))
+        for a in (set (self.actionset) - seen) :
+            self.actionset.remove (a)
 
     def read (self, f, fmt='xes') :
         if isinstance (f, basestring) : f = open (f, 'r')

@@ -156,7 +156,7 @@ class SpMergingEquivalenceFactory :
     @staticmethod
     def one_place (unf) :
 
-        # sp-all
+        # sp-1place
         # merges all events with same label
         # merges all conditions into 1 single place
         # ignores negative info
@@ -177,7 +177,7 @@ class SpMergingEquivalenceFactory :
     @staticmethod
     def pre_singleton (unf) :
 
-        # sp-pre-sgl
+        # sp-pre-single
         # merges all events with same label
         # merges the presets of all events it merges into 1 single place
         # ignores negative info

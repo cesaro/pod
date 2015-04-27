@@ -1,35 +1,64 @@
 """
-pod [OPTIONS] COMMAND LOGFILE/PNMLFILE [DEPENFILE]
 
-Bla bla bla
+pod [OPTIONS] extract-dependence PNMLFILE
+pod [OPTIONS] dump-log           LOGFILE
+pod [OPTIONS] dump-pes           LOGFILE DEPENFILE
+pod [OPTIONS] dump-bp            LOGFILE DEPENFILE
+pod [OPTIONS] dump-encoding      LOGFILE DEPENFILE
+pod [OPTIONS] dump-merge         LOGFILE DEPENFILE
+pod [OPTIONS] merge              LOGFILE DEPENFILE
 
-COMMAND is one of Bla
-LOGFILE is the path to an XML file containing formulas (MCC 2015 format)
+(NOTE: only 'extract-dependence' and 'merge' are so far implemented)
 
-And OPTIONS is zero or more of the following options
+where OPTIONS is zero or more of the following options
 
- --log-first=N
-   Use only the first N sequences of the log file.
+ --help, -h
+   Shows this message.
 
- ...
+ --log-truncate=N
+   Uses only the first N sequences of the log to perform the synthesis. This
+   can be very useful for understanding the transformation performed by the
+   tool.
 
-pod [OPTIONS] extract-dependence    PNML
-pod [OPTIONS] dump-log              LOGFILE
-pod [OPTIONS] dump-pes              LOGFILE DEPENFILE
-pod [OPTIONS] dump-bp               LOGFILE DEPENFILE
-pod [OPTIONS] dump-encoding         LOGFILE DEPENFILE
-pod [OPTIONS] dump-merge            LOGFILE DEPENFILE
-pod [OPTIONS] merge                 LOGFILE DEPENFILE
+ --log-only=N1,N2,...
+   Uses only sequences N1, N2, ... of the log to perform the synthesis. The
+   argument is a comma-separated list of integers indicating the position in
+   the log of the sequences that will be used (first sequence is index 0).
+   (NOTE: not yet implemented)
 
+ --log-exclude=N1,N2
+   Use all sequences in LOGFILE except those whose index is N1, N2, ...
+   (NOTE: not yet implemented)
 
-OPTIONS:
+ --log-negative=LOGFILE
+   Provides a negative log to the tool.
 
---help, -h
---log-first=n
---log-only=1,2,4
---log-exclude=7,23
---output=PATH
+ --output=OUTPUTPATH
+   Save the output of the command to OUTPUTPATH
 
+ --eq=ID
+   Instructs the tool to use the folding equivalence identified by ID. The
+   following are available:
+
+   * id
+     The identity relation
+
+   * sp-1place
+     Merges all events with same label into 1 single transition.
+     Merges all conditions into 1 single place.
+     Ignores negative information.
+
+   * sp-pre-singleton
+     Merges all events with same label into 1 single transition.
+     Merges the presets of all events with the same label into 1 single place.
+     Ignores negative information.
+
+   * sp-pre
+     Merges all events with same label into 1 single transition.
+     Merges the presets of all events with the same label into 1 single place
+     (so all transition's preset will be of size 1).
+     Ignores negative information.
+     (NOTE: not yet implemented)
 """
 
 try :
@@ -67,7 +96,7 @@ class Main :
         self.arg_log_path = ""
         self.arg_depen_path = ""
 
-        self.arg_log_first = -1
+        self.arg_log_trunc = -1
         self.arg_log_only = []
         self.arg_log_exclude = []
         self.arg_log_negative = ""
@@ -101,10 +130,11 @@ class Main :
                 "sp-pre-singleton",
                 "sp-pre",
                 ]
-        #p = argparse.ArgumentParser (usage = __doc__, add_help=False)
-        p = argparse.ArgumentParser (usage=__doc__)
-        #p.add_argument ("-h", "--help", action="store_true")
-        p.add_argument ("--log-first", type=int)
+        p = argparse.ArgumentParser (usage = __doc__, add_help=False)
+        #p = argparse.ArgumentParser (usage=__doc__)
+        p.add_argument ("-h", "--help", action="store_true")
+        #g = p.add_mutually_exclusive_group ()
+        p.add_argument ("--log-truncate", type=int)
         p.add_argument ("--log-only")
         p.add_argument ("--log-negative")
         p.add_argument ("--log-exclude")
@@ -117,17 +147,17 @@ class Main :
         p.add_argument ('depen', metavar="DEPENFILE", nargs="?", default=None)
 
         args = p.parse_args ()
-        print "pod: args:", args
+        #print "pod: args:", args
 
-        #if args.help :
-        #    print __doc__
-        #    sys.exit (0);
+        if args.help :
+            print __doc__
+            sys.exit (0);
 
         self.arg_command = args.cmd
         self.arg_depen_path = args.depen
         self.arg_eq = args.eq
         self.arg_log_path = args.log_pnml
-        self.arg_log_first = args.log_first
+        self.arg_log_trunc = args.log_truncate
         self.arg_log_negative = args.log_negative
 
         if self.arg_command not in ["extract-dependence", "dump-log"] :
@@ -159,14 +189,14 @@ class Main :
                     "arg_command",
                     "arg_depen_path",
                     "arg_log_path",
-                    "arg_log_first",
+                    "arg_log_trunc",
                     "arg_log_only",
                     "arg_log_exclude",
                     "arg_log_negative",
                     "arg_output_path",
                     "arg_eq",
                     ] :
-            output_pair (sys.stdout, opt, self.__dict__[opt], 16, "pod: args: ")
+            output_pair (sys.stdout, opt, self.__dict__[opt], 16, "pod: ")
 
     def main (self) :
         self.parse_cmdline_args ()
@@ -249,17 +279,25 @@ class Main :
         #try :
         #except Exception as (e, m) :
         #    raise Exception, "'%s': %s" % (self.arg_output_path, m)
-        print "pod: net saved to '%s'" % self.arg_output_path
+        print "pod: result net saved to '%s'" % self.arg_output_path
 
     def __load_all_logs (self) :
         # create a new action set
         self.acset = ActionSet ()
 
         # load the positive log
-        print "pod: loading log with positive information"
+        print "pod: logs: loading log with positive information"
         self.log = self.__load_log (self.arg_log_path, \
-                "pod: positive: ")
-        #self.log.traces = self.log.traces[:2]
+                "pod: logs: positive: ")
+
+        # truncate the log according to options --log-{first,only,exclude}
+        if self.arg_log_trunc != -1 :
+            print "pod: logs: positive: truncating: keeping only first %d seq" \
+                % self.arg_log_trunc
+            self.log.truncate (self.arg_log_trunc)
+            nre = sum (len (seq) for seq in self.log.traces)
+            print 'pod: logs: positive: new log: %d seq, %d log events, %d distinct actions' \
+                    % (len (self.log.traces), nre, len (self.acset))
 
         # create another log to store positive and negative information and
         # set its actionset to the be the same as the positive log, so all
@@ -269,9 +307,9 @@ class Main :
 
         # load negative and fill log_both
         if self.arg_log_negative != None :
-            print "pod: loading log with negative information"
+            print "pod: logs: loading log with negative information"
             self.log_negative = self.__load_log (self.arg_log_negative, \
-                    "pod: negative: ")
+                    "pod: logs: negative: ")
             self.log_both.union (self.log_negative)
 
     def __load_log (self, path, prefix="pod: ") :
@@ -285,7 +323,7 @@ class Main :
         except Exception as (e, m) :
             raise Exception, "'%s': %s" % (path, m)
         nre = sum (len (seq) for seq in log.traces)
-        print '%sdone, %d logs, %d log events, %d distinct actions' \
+        print '%sdone, %d seq, %d log events, %d distinct actions' \
                 % (prefix, len (log.traces), nre, len (self.acset))
         return log
 
@@ -361,6 +399,5 @@ class Main :
 
         # verify transformations
         bp_to_net_assert_sp (self.bp, self.meq, e2t, c2p)
-
 
 # vi:ts=4:sw=4:et:
