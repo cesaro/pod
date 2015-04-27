@@ -112,37 +112,6 @@ class Log :
         self.traces.extend (other.traces)
         return self
 
-    def to_pes (self, indep) :
-        es = pes.PES ()
-        i = 0
-        for seq in self.traces :
-            self.__trace_to_pes (es, i, seq, indep)
-            i += 1
-        return es
-
-    def __trace_to_pes (self, es, i, seq, indep) :
-        c = es.get_empty_config ()
-        print 'pod: log > pes: seq %d len %d first %s' % \
-                (i, len (seq), seq[:15])
-        #print 'pes', es
-        j = 0
-        for logev in seq :
-            a = logev.action
-            l = [e for e in c.enabled () if e.label == a]
-            assert (len (l) == 0 or len (l) == 1)
-            if l :
-                e = l[0]
-            else :
-                max_events = c.find_h0 (a, indep)
-                e = es.add_event (a, max_events)
-                es.set_cfls (e, indep)
-                c.update_enabled_hint (e)
-                print "pod: log > pes:  %s i %d" % (e, j)
-            c.add (e)
-            if len (e.pre) == 0 :
-                es.update_minimal_hint (e)
-            j += 1
-
     def extract_indep_from_net (self, net) :
         # FIXME -- remove this, funcitonality is now in
         # Depen.from_net_names
