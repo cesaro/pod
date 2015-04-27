@@ -1,7 +1,4 @@
 
-from pod import *
+from main import *
 
-#import log
-#import folding
-#import util
 import test

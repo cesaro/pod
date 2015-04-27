@@ -103,10 +103,9 @@ YACC:=bison
 	@echo "DOT $<"
 	@dot -T jpg < $< > $@
 
-%.dot : %.ll_net
+%.dot : %.pnml
 	@echo "P2D $<"
-	@src/pep2dot $< > $@
-	@#tools/pep2dot.py < $< > $@
+	@src/pnml2dot.py < $< > $@
 
 %.ll_net : %.cuf
 	@echo "C2P $<"

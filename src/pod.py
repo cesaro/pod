@@ -4,8 +4,8 @@ if __name__ == '__main__' :
     import sys
     import pod
 
-    tool = pod.Pod ()
-    tool.main ()
+    m = pod.Main ()
+    m.main ()
     #pod.test.test18 ()
     sys.exit (0)
 
