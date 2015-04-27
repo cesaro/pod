@@ -177,7 +177,7 @@ class SpMergingEquivalenceFactory :
     @staticmethod
     def pre_singleton (unf) :
 
-        # sp-pre-single
+        # sp-pre-singleton
         # merges all events with same label
         # merges the presets of all events it merges into 1 single place
         # ignores negative info
@@ -210,4 +210,46 @@ class SpMergingEquivalenceFactory :
         meq.assert_is_equivalence ()
         return meq
 
+    @staticmethod
+    def pre_max (unf) :
+
+        # sp-pre
+        # Merges all events with same label into 1 single transition.
+        # Merges the presets of all events with the same label into 1 single place
+        # Ignores negative information.
+
+        domain = set (unf.events) | set (unf.conds)
+        meq = ComputedMergingEquivalence (domain)
+        i = 0
+        for a in unf.net.trans :
+            # merge all events with same label
+            for e in a.inverse_label :
+                meq.tag_class (e, i)
+            i += 1
+
+            if len (a.inverse_label) <= 1 :
+                # if we are not merging events, do NOT merge the preset
+                for e in a.inverse_label :
+                    for c in e.pre :
+                        meq.tag_class (c, i)
+                        i += 1
+                continue
+
+            # if we are merging at least 2 events, do the mess ...
+            nr = min (len (e.pre) for e in a.inverse_label)
+            tags = range (i, i + nr)
+            fst_tag = tags[0]
+            i += nr
+            for e in a.inverse_label :
+                l = tags + [fst_tag] * (len (e.pre) - nr)
+                #print 'pod: zip:', zip (l, e.pre)
+                assert (len (l) == len (e.pre))
+                for tag,c in zip (l, e.pre) :
+                    meq.tag_class (c, tag)
+
+        # since all conditions are in the preset of some event, the
+        # previous should define an equivalence class for all of them
+
+        meq.assert_is_equivalence ()
+        return meq
 # vi:ts=4:sw=4:et:

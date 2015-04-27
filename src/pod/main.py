@@ -53,12 +53,12 @@ where OPTIONS is zero or more of the following options
      Merges the presets of all events with the same label into 1 single place.
      Ignores negative information.
 
-   * sp-pre
+   * sp-pre-max
      Merges all events with same label into 1 single transition.
-     Merges the presets of all events with the same label into 1 single place
-     (so all transition's preset will be of size 1).
+     Merges the presets of all events with the same label trying to get the
+     largest set of equivalence classes possible, ie, trying to merge as less
+     as possible.
      Ignores negative information.
-     (NOTE: not yet implemented)
 """
 
 try :
@@ -128,7 +128,7 @@ class Main :
                 "id",
                 "sp-1place",
                 "sp-pre-singleton",
-                "sp-pre",
+                "sp-pre-max",
                 ]
         p = argparse.ArgumentParser (usage = __doc__, add_help=False)
         #p = argparse.ArgumentParser (usage=__doc__)
@@ -273,12 +273,12 @@ class Main :
         self.__merge ()
 
         # save the net
-        f = open (self.arg_output_path, "w")
-        self.net.write (f, 'pnml')
-        f.close ()
-        #try :
-        #except Exception as (e, m) :
-        #    raise Exception, "'%s': %s" % (self.arg_output_path, m)
+        try :
+            f = open (self.arg_output_path, "w")
+            self.net.write (f, 'pnml')
+            f.close ()
+        except Exception as (e, m) :
+            raise Exception, "'%s': %s" % (self.arg_output_path, m)
         print "pod: result net saved to '%s'" % self.arg_output_path
 
     def __load_all_logs (self) :
@@ -291,7 +291,7 @@ class Main :
                 "pod: logs: positive: ")
 
         # truncate the log according to options --log-{first,only,exclude}
-        if self.arg_log_trunc != -1 :
+        if self.arg_log_trunc != None :
             print "pod: logs: positive: truncating: keeping only first %d seq" \
                 % self.arg_log_trunc
             self.log.truncate (self.arg_log_trunc)
@@ -388,8 +388,8 @@ class Main :
             self.meq = SpMergingEquivalenceFactory.one_place (self.bp)
         elif self.arg_eq == "sp-pre-singleton" :
             self.meq = SpMergingEquivalenceFactory.pre_singleton (self.bp)
-        elif self.arg_eq == "sp-pre" :
-            raise NotImplementedError
+        elif self.arg_eq == "sp-pre-max" :
+            self.meq = SpMergingEquivalenceFactory.pre_max (self.bp)
         else :
             raise AssertionError, "Internal inconsistency"
 
