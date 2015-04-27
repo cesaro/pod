@@ -26,6 +26,9 @@ class MergingEquivalence :
     def classes (self) :
         return [[x] for x in self.domain]
 
+    def assert_is_equivalence (self) :
+        return NotImplementedError
+
     def __repr__ (self) :
         return str (self.classes ())
     def __str__ (self) :
@@ -77,9 +80,13 @@ class ComputedMergingEquivalence (MergingEquivalence) :
         self.class_by_member = {}
 
     def set_class (self, x, class_id) :
+        # FIXME
+        # there is a bug here, the code is broken!
         self.is_in_domain ([x])
         if class_id in self.class_by_id :
             self.class_by_id[class_id].add (x)
+        elif x in self.class_by_member :
+            self.class_by_id[class_id] = self.class_by_member[x]
         else :
             self.class_by_id[class_id] = set ([x])
         self.class_by_member[x] = self.class_by_id[class_id]
@@ -88,7 +95,13 @@ class ComputedMergingEquivalence (MergingEquivalence) :
     def are_merged (self, x, y) :
         if x == y : return True
         self.is_in_domain ([x, y])
-        return self.class_by_member[x] == self.class_by_member[y]
+        if x not in self.class_by_member :
+            raise LookupError, \
+                "'%s': unknown equivalence class" % repr (x)
+        if y not in self.class_by_member :
+            raise LookupError, \
+                "'%s': unknown equivalence class" % repr (y)
+        return id (self.class_by_member[x]) == id (self.class_by_member[y])
 
     def class_of (self, x) :
         self.is_in_domain ([x])
@@ -98,7 +111,7 @@ class ComputedMergingEquivalence (MergingEquivalence) :
         return self.class_by_member[x]
 
     def classes (self) :
-        return self.class_by_id.values ()
+        return list (set (tuple (x) for x in self.class_by_member.values ()))
 
 class IdentityMergingEquivalence (MergingEquivalence) :
     pass

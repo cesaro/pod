@@ -152,9 +152,11 @@ class SmtEquivalenceFinder :
         return net
 
 class SpMergingEquivalenceFactory :
+
     @staticmethod
     def one_place (unf) :
 
+        # sp-all
         # merges all events with same label
         # merges all conditions into 1 single place
         # ignores negative info
@@ -169,6 +171,43 @@ class SpMergingEquivalenceFactory :
         for c in unf.conds :
             meq.set_class (c, i)
 
+        return meq
+
+    @staticmethod
+    def pre_singleton (unf) :
+
+        # sp-pre-sgl
+        # merges all events with same label
+        # merges the presets of all events it merges into 1 single place
+        # ignores negative info
+
+        domain = set (unf.events) | set (unf.conds)
+        meq = ComputedMergingEquivalence (domain)
+        i = 0
+        for a in unf.net.trans :
+            # merge all events with same label
+            for e in a.inverse_label :
+                meq.set_class (e, i)
+            i += 1
+
+            if len (a.inverse_label) <= 1 :
+                # if we are not merging events, do NOT merge the preset
+                for e in a.inverse_label :
+                    for c in e.pre :
+                        meq.set_class (c, i)
+                        i += 1
+            else :
+                # if we are merging at least 2 events, merge ALL places into 1
+                for e in a.inverse_label :
+                    for c in e.pre :
+                        print 'pod: pre_singleton: c %s i %d' % (c, i)
+                        meq.set_class (c, i)
+                i += 1
+
+        # since all conditions are in the preset of some event, the
+        # previous should define an equivalence class for all of them
+
+        unf.write ('unf.dot', 'dot')
         return meq
 
 # vi:ts=4:sw=4:et:

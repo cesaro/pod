@@ -186,7 +186,7 @@ def bp_to_net (unf, meq) :
 
     # merge events
     print 'pod: bp > net: folding events:'
-    single_t = 0
+    single_t = []
     for eqclass in meq.classes () :
         assert (len (eqclass) >= 1)
         e = next (iter (eqclass))
@@ -194,16 +194,17 @@ def bp_to_net (unf, meq) :
         t = net.trans_add (e.label)
         for e in eqclass : e2t[e] = t
         if len (eqclass) == 1 :
-            single_t += 1
+            single_t.append (next (iter (eqclass)))
         else :
-            print "pod: bp > net: * ac %s %d events %s" % \
+            print "pod: bp > net: * ac %s, %d events: %s" % \
                     (t.name, len (eqclass), long_list (eqclass, 10))
+    print "pod: bp > net: * ... %d events didn't merge: %s" % \
+            (len (single_t), long_list (single_t, 15))
     
 
     # merge conditions
     print 'pod: bp > net: folding conditions:'
-    single_t = 0
-    single_p = 0
+    single_p = []
     for eqclass in meq.classes () :
         assert (len (eqclass) >= 1)
         c = next (iter (eqclass))
@@ -211,14 +212,16 @@ def bp_to_net (unf, meq) :
         p = net.place_add (long_list (eqclass, 5))
         for c in eqclass : c2p[c] = p
         if len (eqclass) == 1 :
-            single_p += 1
+            single_p.append (next (iter (eqclass)))
         else :
-            print "pod: bp > net: * %d conds %s" % \
-                    (len (eqclass), long_list (eqclass, 10))
+            print "pod: bp > net: * %d conds: %s" % \
+                    (len (eqclass), long_list (eqclass, 20))
+    print "pod: bp > net: * ... %d conditions didn't merge: %s" % \
+            (len (single_p), long_list (single_p, 15))
     print "pod: bp > net: transitions: %d singleton classes, %d non-singleton" % \
-            (single_t, len (net.trans) - single_t)
+            (len (single_t), len (net.trans) - len (single_t))
     print "pod: bp > net: places: %d singleton classes, %d non-singleton" % \
-            (single_p, len (net.places) - single_p)
+            (len (single_p), len (net.places) - len (single_p))
 
     # build flow
     print 'pod: bp > net: folding flow relation'
@@ -232,9 +235,6 @@ def bp_to_net (unf, meq) :
     for c in unf.m0 :
         net.m0[c2p[c]] = 1
 
-    print 'pod: bp > net: verifying transformations...'
-    __bp_to_net_assert_post (unf, meq, e2t, c2p)
-
     print "pod: bp > net: done, %d transitions, %d places" \
             % (len (net.trans), len (net.places))
     return (net, e2t, c2p)
@@ -245,7 +245,7 @@ def __bp_to_net_assert_pre (unf, meq) :
     for e in unf.events :
         assert (len (e.pre))
 
-def __bp_to_net_assert_post (unf, meq, e2t, c2p) :
+def bp_to_net_assert_sp (unf, meq, e2t, c2p) :
 
     assert (len (e2t) == len (unf.events))
     assert (len (c2p) == len (unf.conds))
@@ -256,21 +256,26 @@ def __bp_to_net_assert_post (unf, meq, e2t, c2p) :
         for ee in e2t :
             if e2t[ee] == t :
                 assert (meq.are_merged (e, ee))
-                __bp_to_net_assert_subset (meq, e, ee)
-                __bp_to_net_assert_subset (meq, ee, e)
+                print 'pod: e %s ee %s' % (e, ee)
+                __bp_to_net_assert_subset (meq, e.pre, ee.pre)
+                __bp_to_net_assert_subset (meq, ee.pre, e.pre)
 
-    # if two conditions gave the same place, then they were equivalence
+    # if two conditions gave the same place, then they were equivalent
     # ...
     for c,p in c2p.items () :
         for cc in c2p :
             if c2p[cc] == p :
                 assert (meq.are_merged (c, cc))
 
-def __bp_to_net_assert_subset (meq, e, ee) :
-    # all events in preset and postset of e are merged with at least
-    # one of ee
-    for x,y in [(e.pre, ee.pre), (e.post, ee.post)] :
-        for c in x :
-            assert (any (map (lambda cc : meq.are_merged (c, cc), y)))
+def __bp_to_net_assert_subset (meq, x, y) :
+    # every condition in x has been merged to some condition of y
+    for c in x :
+        print 'pod: c %s x %s y %s' % (c, x, y)
+        aha = next (iter (y))
+        print 'pod: c %s aha %s result %s' % (repr (c), repr (aha), meq.are_merged (c, aha))
+        if not meq.are_merged (c, aha) :
+            print 'class c', meq.class_of (c)
+            print 'class aha', meq.class_of (aha)
+        assert (any (map (lambda cc : meq.are_merged (c, cc), y)))
 
 # vi:ts=4:sw=4:et:
