@@ -97,8 +97,9 @@ class Main :
                 ]
         eq_choices = [
                 "id",
-                "sp-all",
-                "sp-pre-sgl",
+                "sp-1place",
+                "sp-pre-singleton",
+                "sp-pre",
                 ]
         #p = argparse.ArgumentParser (usage = __doc__, add_help=False)
         p = argparse.ArgumentParser (usage=__doc__)
@@ -345,10 +346,12 @@ class Main :
         if self.arg_eq == "id" :
             domain = set (self.bp.events) | set (self.bp.conds)
             self.meq = IdentityMergingEquivalence (domain)
-        elif self.arg_eq == "sp-all" :
+        elif self.arg_eq == "sp-1place" :
             self.meq = SpMergingEquivalenceFactory.one_place (self.bp)
-        elif self.arg_eq == "sp-pre-sgl" :
+        elif self.arg_eq == "sp-pre-singleton" :
             self.meq = SpMergingEquivalenceFactory.pre_singleton (self.bp)
+        elif self.arg_eq == "sp-pre" :
+            raise NotImplementedError
         else :
             raise AssertionError, "Internal inconsistency"
 
@@ -357,7 +360,6 @@ class Main :
         self.net = net
 
         # verify transformations
-        print 'pod: bp > net: asserting correctness of made transformations...'
         bp_to_net_assert_sp (self.bp, self.meq, e2t, c2p)
 
 

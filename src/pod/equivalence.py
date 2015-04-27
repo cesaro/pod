@@ -27,7 +27,33 @@ class MergingEquivalence :
         return [[x] for x in self.domain]
 
     def assert_is_equivalence (self) :
-        return NotImplementedError
+        # we asser that
+        # - every class is disjoint from any other class
+        # - every element of the domain is in at least one class
+        # to do it we just iterate through all elements of all classes, and
+        # watch if we see two times the same element, checking at the end
+        # that we saw all elements of the domain
+
+        e2c = {}
+        for c in self.classes () :
+            for e in c :
+                if e in e2c :
+                    # already seen!
+                    raise AssertionError, \
+                            "Element '%s' is two classes, %s and %s" % \
+                            (repr (e), long_list (c, 5), long_list (e2c[e], 5))
+                e2c[e] = c
+        seen = set (e2c.keys ())
+        if not self.domain <= seen :
+            print 'seen', seen
+            print 'domain', self.domain
+            raise AssertionError, \
+                    "The set of classes contains less elements than the domain!"
+        if not seen <= self.domain :
+            print 'seen', seen
+            print 'domain', self.domain
+            raise AssertionError, \
+                    "The set of classes contains more elements than the domain!"
 
     def __repr__ (self) :
         return str (self.classes ())
@@ -76,42 +102,81 @@ class Smt2MergingEquivalence (MergingEquivalence) :
 class ComputedMergingEquivalence (MergingEquivalence) :
     def __init__ (self, domain) :
         MergingEquivalence.__init__ (self, domain)
-        self.class_by_id = {}
-        self.class_by_member = {}
+        self.__tag2class = {}
+        self.__class2tags = {}
+        self.__mem2class = {}
 
-    def set_class (self, x, class_id) :
-        # FIXME
-        # there is a bug here, the code is broken!
+    def __merge_classes (self, c1, c2) :
+        # optimization: merge the smaller one into the larger one :)
+        if id (c1) == id (c2) : return
+        if len (c2) > len (c1) :
+            c = c1
+            c1 = c2
+            c2 = c
+
+        # move all elements of c2 into c1
+        c1.update (c2)
+
+        # update the pointer of all members of c2 in mem2class to point to c1
+        for e in c2 :
+            self.__mem2class[e] = c1
+
+        # same for the tags, all tags pointing to c2 must now point to c1
+        tagsc2 = self.__class2tags[id(c2)]
+        for tag in tagsc2 :
+            self.__tag2class[tag] = c1
+
+        # all tags of c2 are now tags of c1
+        self.__class2tags[id(c1)].update (tagsc2)
+        del self.__class2tags[id(c2)]
+        return c1
+
+    def tag_class (self, x, tag) :
+        # find x's class, or create a new one
         self.is_in_domain ([x])
-        if class_id in self.class_by_id :
-            self.class_by_id[class_id].add (x)
-        elif x in self.class_by_member :
-            self.class_by_id[class_id] = self.class_by_member[x]
+        try :
+            c = self.__mem2class[x]
+        except KeyError :
+            c = self.__mem2class[x] = set ([x])
+            self.__class2tags[id(c)] = set ()
+
+        # if the tag is new and unknown, update the tables
+        if tag not in self.__tag2class :
+            self.__tag2class[tag] = c
+            self.__class2tags[id(c)].add (tag)
         else :
-            self.class_by_id[class_id] = set ([x])
-        self.class_by_member[x] = self.class_by_id[class_id]
-        return self.class_by_member[x]
-        
-    def are_merged (self, x, y) :
-        if x == y : return True
-        self.is_in_domain ([x, y])
-        if x not in self.class_by_member :
-            raise LookupError, \
-                "'%s': unknown equivalence class" % repr (x)
-        if y not in self.class_by_member :
-            raise LookupError, \
-                "'%s': unknown equivalence class" % repr (y)
-        return id (self.class_by_member[x]) == id (self.class_by_member[y])
+            # if it is not new, it already pointed to some class and we
+            # need to merge x's class and that class
+            c = self.__merge_classes (c, self.__tag2class[tag])
+        return c
 
-    def class_of (self, x) :
+    def __memb_is_known (self, it) :
+        for x in it :
+            if x not in self.__mem2class :
+                raise LookupError, "No equivalence class defined for '%s'" % repr (x)
+    def __tag_is_known (self, it) :
+        for tag in it :
+            if tag not in self.__tag2class :
+                raise LookupError, "No equivalence class defined for tag '%s'" % repr (tag)
+
+    def are_merged (self, x, y) :
+        self.is_in_domain ([x, y])
+        self.__memb_is_known ([x, y])
+        if id (x) == id (y) : return True
+        return id (self.__mem2class[x]) == id (self.__mem2class[y])
+
+    def class_of (self, x ) :
+        return self.class_of_member (x)
+    def class_of_member (self, x) :
         self.is_in_domain ([x])
-        if x not in self.class_by_member :
-            raise LookupError, \
-                "'%s': unknown equivalence class" % repr (x)
-        return self.class_by_member[x]
+        self.__memb_is_known ([x])
+        return self.__mem2class[x]
+    def class_of_tag (self, tag) :
+        self.__tag_is_known ([tag])
+        return self.__tag2class[tag]
 
     def classes (self) :
-        return list (set (tuple (x) for x in self.class_by_member.values ()))
+        return list (set (tuple (x) for x in self.__tag2class.values ()))
 
 class IdentityMergingEquivalence (MergingEquivalence) :
     pass

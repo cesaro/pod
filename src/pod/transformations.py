@@ -209,7 +209,7 @@ def bp_to_net (unf, meq) :
         assert (len (eqclass) >= 1)
         c = next (iter (eqclass))
         if not isinstance (c, ptnet.Condition) : continue
-        p = net.place_add (long_list (eqclass, 5))
+        p = net.place_add (long_list (eqclass, 2))
         for c in eqclass : c2p[c] = p
         if len (eqclass) == 1 :
             single_p.append (next (iter (eqclass)))
@@ -218,9 +218,9 @@ def bp_to_net (unf, meq) :
                     (len (eqclass), long_list (eqclass, 20))
     print "pod: bp > net: * ... %d conditions didn't merge: %s" % \
             (len (single_p), long_list (single_p, 15))
-    print "pod: bp > net: transitions: %d singleton classes, %d non-singleton" % \
+    print "pod: bp > net: summary: transitions: %d singleton classes, %d non-singleton" % \
             (len (single_t), len (net.trans) - len (single_t))
-    print "pod: bp > net: places: %d singleton classes, %d non-singleton" % \
+    print "pod: bp > net: summary: places: %d singleton classes, %d non-singleton" % \
             (len (single_p), len (net.places) - len (single_p))
 
     # build flow
@@ -247,6 +247,8 @@ def __bp_to_net_assert_pre (unf, meq) :
 
 def bp_to_net_assert_sp (unf, meq, e2t, c2p) :
 
+    print 'pod: bp > net: asserting correctness: checking that folding was SP...'
+
     assert (len (e2t) == len (unf.events))
     assert (len (c2p) == len (unf.conds))
 
@@ -256,9 +258,24 @@ def bp_to_net_assert_sp (unf, meq, e2t, c2p) :
         for ee in e2t :
             if e2t[ee] == t :
                 assert (meq.are_merged (e, ee))
-                print 'pod: e %s ee %s' % (e, ee)
+                #print 'pod: e %s ee %s' % (e, ee)
                 __bp_to_net_assert_subset (meq, e.pre, ee.pre)
                 __bp_to_net_assert_subset (meq, ee.pre, e.pre)
+
+    # same but checked differently: if two events were merged, then the set of
+    # equivalence classes in their preset is equal
+    for e,t in e2t.items () :
+        for ee in e2t :
+            if e2t[ee] == t :
+                eqclasses_e = set (frozenset (meq.class_of (c)) for c in e.pre)
+                eqclasses_ee = set (frozenset (meq.class_of (c)) for c in ee.pre)
+                assert (eqclasses_e == eqclasses_ee)
+                # and again differently :)
+                _eqclasses_e = set (c2p[c] for c in e.pre)
+                _eqclasses_ee = set (c2p[c] for c in ee.pre)
+                assert (_eqclasses_e == _eqclasses_ee)
+                assert (len (_eqclasses_e) == len (eqclasses_e))
+                assert (len (_eqclasses_ee) == len (eqclasses_ee))
 
     # if two conditions gave the same place, then they were equivalent
     # ...
@@ -270,12 +287,7 @@ def bp_to_net_assert_sp (unf, meq, e2t, c2p) :
 def __bp_to_net_assert_subset (meq, x, y) :
     # every condition in x has been merged to some condition of y
     for c in x :
-        print 'pod: c %s x %s y %s' % (c, x, y)
-        aha = next (iter (y))
-        print 'pod: c %s aha %s result %s' % (repr (c), repr (aha), meq.are_merged (c, aha))
-        if not meq.are_merged (c, aha) :
-            print 'class c', meq.class_of (c)
-            print 'class aha', meq.class_of (aha)
+        #print 'pod: c %s x %s y %s' % (c, x, y)
         assert (any (map (lambda cc : meq.are_merged (c, cc), y)))
 
 # vi:ts=4:sw=4:et:

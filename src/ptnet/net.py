@@ -172,6 +172,8 @@ class Marking :
             assert (self.__marking[p] > 0)
         return value
 
+    def __len__ (self) :
+        return len (self.__marking)
     def __iter__ (self) :
         for p in self.__marking :
             yield p
@@ -662,8 +664,8 @@ class Net :
             f.write (s)
 
         if full :
-            f.write ('\n\tgraph [label="%d transitions\\n%d places"];\n}\n' %
-                    (len (self.trans), len (self.places)))
+            f.write ('\n\tgraph [label="%d transitions\\n%d places (%d initial)"];\n}\n' %
+                    (len (self.trans), len (self.places), len (self.m0)))
 
     def __write_pnml (self, f, m=0) :
         s = '<?xml version="1.0" encoding="UTF-8"?>\n'

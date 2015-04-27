@@ -166,11 +166,12 @@ class SpMergingEquivalenceFactory :
         i = 0
         for a in unf.net.trans :
             for e in a.inverse_label :
-                meq.set_class (e, i)
+                meq.tag_class (e, i)
             i += 1
         for c in unf.conds :
-            meq.set_class (c, i)
+            meq.tag_class (c, i)
 
+        meq.assert_is_equivalence ()
         return meq
 
     @staticmethod
@@ -187,27 +188,26 @@ class SpMergingEquivalenceFactory :
         for a in unf.net.trans :
             # merge all events with same label
             for e in a.inverse_label :
-                meq.set_class (e, i)
+                meq.tag_class (e, i)
             i += 1
 
             if len (a.inverse_label) <= 1 :
                 # if we are not merging events, do NOT merge the preset
                 for e in a.inverse_label :
                     for c in e.pre :
-                        meq.set_class (c, i)
+                        meq.tag_class (c, i)
                         i += 1
             else :
                 # if we are merging at least 2 events, merge ALL places into 1
                 for e in a.inverse_label :
                     for c in e.pre :
-                        print 'pod: pre_singleton: c %s i %d' % (c, i)
-                        meq.set_class (c, i)
+                        meq.tag_class (c, i)
                 i += 1
 
         # since all conditions are in the preset of some event, the
         # previous should define an equivalence class for all of them
 
-        unf.write ('unf.dot', 'dot')
+        meq.assert_is_equivalence ()
         return meq
 
 # vi:ts=4:sw=4:et:
