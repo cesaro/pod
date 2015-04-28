@@ -6,7 +6,7 @@ if __name__ == '__main__' :
 
     m = pod.Main ()
     m.main ()
-    #pod.test.test18 ()
+    #pod.test.test8 ()
     sys.exit (0)
 
     try :

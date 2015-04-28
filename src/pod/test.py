@@ -232,6 +232,7 @@ def test8 () :
 
         print m[0]
         print 'type 0', type (m[0])
+        print '0 class', m[0].__class__
         print 'type constrain', type (y > 1023)
         print 'type m[x]', type (m[x])
         print 'type m[x].as_long', type (m[x].as_long ())
@@ -243,7 +244,6 @@ def test8 () :
         print m[n]
 
 def test9 () :
-    import z3
 
     s = z3.Solver ()
 
@@ -255,8 +255,10 @@ def test9 () :
 
     s.add (p == (x == y))
     s.add (x == y)
-    s.add (z3.Not (p))
+    #s.add (z3.Not (p))
     s.add (0 <= sum ([y, z], x))
+    s.add (True)
+    s.add (z3.Distinct ([x, y, z]))
 
     print 'solving', s
     r = s.check ()

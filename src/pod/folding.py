@@ -151,7 +151,7 @@ class SmtEquivalenceFinder :
         self.net = net
         return net
 
-class SpMergingEquivalenceFactory :
+class Merging_equivalence_factory_sp :
 
     @staticmethod
     def one_place (unf) :
@@ -213,7 +213,7 @@ class SpMergingEquivalenceFactory :
     @staticmethod
     def pre_max (unf) :
 
-        # sp-pre
+        # sp-pre-max
         # Merges all events with same label into 1 single transition.
         # Merges the presets of all events with the same label into 1 single place
         # Ignores negative information.
@@ -252,4 +252,54 @@ class SpMergingEquivalenceFactory :
 
         meq.assert_is_equivalence ()
         return meq
+
+    @staticmethod
+    def pre_distinct (unf) :
+
+        # sp-pre-distinct
+
+        encoding = SMT_encoding_sp_distinct (unf)
+        print 'pod: bp > net: building SMT encoding...'
+        encoding.encode ()
+        result = encoding.solve (10 * 1000)
+        print 'pod: bp > net: solving, timeout 10s'
+        if result == encoding.UNSAT :
+            print 'pod: bp > net: UNSAT, cannot find a merging equivalence'
+            return None
+        if result == encoding.UNDEF :
+            print 'pod: bp > net: UNDEF, cannot find a merging equivalence'
+            return None
+        print 'pod: bp > net: SAT, building merging equivalence'
+
+        model = encoding.model ()
+        #print 'pod: entire model', model
+        for c in unf.conds :
+            var = encoding.varmap (c)
+            val = model[var].as_long () if model[var] != None else "??"
+            #print 'pod: %4s %s' % (val, c)
+
+
+        # using the model, compute a merging equivalence
+        domain = set (unf.events) | set (unf.conds)
+        meq = ComputedMergingEquivalence (domain)
+        i = 0
+        for a in unf.net.trans :
+            # merge all events with same label
+            for e in a.inverse_label :
+                meq.tag_class (e, ('mine', i))
+            i += 1
+
+        # for conditions, copy the integer values of the model, and assign new
+        # values to those undefined variables
+        for c in unf.conds :
+            v = encoding.varmap (c)
+            if model[v] != None :
+                tag = ('z3', model[v].as_long ())
+            else :
+                tag = ('mine', i)
+                i += 1
+            meq.tag_class (c, tag)
+
+        return meq
+
 # vi:ts=4:sw=4:et:

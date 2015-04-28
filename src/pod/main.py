@@ -59,6 +59,8 @@ where OPTIONS is zero or more of the following options
      largest set of equivalence classes possible, ie, trying to merge as less
      as possible.
      Ignores negative information.
+
+   * sp-pre-distinct
 """
 
 try :
@@ -129,6 +131,7 @@ class Main :
                 "sp-1place",
                 "sp-pre-singleton",
                 "sp-pre-max",
+                "sp-pre-distinct",
                 ]
         p = argparse.ArgumentParser (usage = __doc__, add_help=False)
         #p = argparse.ArgumentParser (usage=__doc__)
@@ -385,13 +388,19 @@ class Main :
             domain = set (self.bp.events) | set (self.bp.conds)
             self.meq = IdentityMergingEquivalence (domain)
         elif self.arg_eq == "sp-1place" :
-            self.meq = SpMergingEquivalenceFactory.one_place (self.bp)
+            self.meq = Merging_equivalence_factory_sp.one_place (self.bp)
         elif self.arg_eq == "sp-pre-singleton" :
-            self.meq = SpMergingEquivalenceFactory.pre_singleton (self.bp)
+            self.meq = Merging_equivalence_factory_sp.pre_singleton (self.bp)
         elif self.arg_eq == "sp-pre-max" :
-            self.meq = SpMergingEquivalenceFactory.pre_max (self.bp)
+            self.meq = Merging_equivalence_factory_sp.pre_max (self.bp)
+        elif self.arg_eq == "sp-pre-distinct" :
+            self.meq = Merging_equivalence_factory_sp.pre_distinct (self.bp)
         else :
             raise AssertionError, "Internal inconsistency"
+
+        # if the previous was unable to find a folding equivalence, abort
+        if self.meq == None :
+            raise Exception, "Couldn't find a folding equivalence with requested characteristics, aborting"
 
         # the merge equivalence is meq, folding the BP into a net
         (net, e2t, c2p) = bp_to_net (self.bp, self.meq)

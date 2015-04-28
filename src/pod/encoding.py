@@ -3,21 +3,26 @@ import sat
 import ptnet
 import z3
 
-class SmtEquivalenceEncoding :
+class Base_encoding :
+
+    SAT   = 'sat'
+    UNSAT = 'unsat'
+    UNDEF = 'undef'
+
     def __init__ (self, unfolding) :
         self.unf = unfolding
-        self.satf = None
-        self.z3 = None
-        self.k = -1
         self.__co = None
-
-        self.__compute_co_relation ()
 
         # many algorithms in here rely on this property
         for i in range (len (self.unf.events)) :
             assert (self.unf.events[i].nr == i)
         for i in range (len (self.unf.conds)) :
             assert (self.unf.conds[i].nr == i)
+
+    def solve (self) :
+        pass
+    def model (self) :
+        pass
 
     def stats (self) :
         # nr of events, conditions, labels
@@ -55,14 +60,14 @@ class SmtEquivalenceEncoding :
         d['labels.distrib.min/max/avg'] = (nmin, nmax, avg)
         d['labels.histogram'] = histo
 
-        if self.z3 :
-            d['z3.constaints'] = len (self.z3.assertions())
-        if self.satf :
-            d['sat.clauses'] = len (self.satf.clsset)
-            d['sat.vars']    = len (self.satf.varmap)
+        #if self.z3 :
+        #    d['z3.constaints'] = len (self.z3.assertions())
+        #if self.satf :
+        #    d['sat.clauses'] = len (self.satf.clsset)
+        #    d['sat.vars']    = len (self.satf.varmap)
         return d
 
-    def __ord_pair (self, x, y) :
+    def ord_pair (self, x, y) :
         if x.nr < y.nr :
             return (x, y)
         else :
@@ -70,7 +75,11 @@ class SmtEquivalenceEncoding :
 
     def are_co (self, c1, c2) :
         self.__compute_co_relation ()
-        return self.__ord_pair (c1, c2) in self.__co
+        return self.ord_pair (c1, c2) in self.__co
+
+    def co_relation (self) :
+        self.__compute_co_relation ()
+        return self.__co
 
     def __compute_co_relation (self) :
         if self.__co != None :
@@ -119,12 +128,18 @@ class SmtEquivalenceEncoding :
             if c.m == mpast or c.m == mfuture : continue
             if c != cgoal :
                 l.append (c)
-                self.__co.add (self.__ord_pair (cgoal, c))
+                self.__co.add (self.ord_pair (cgoal, c))
         #print "podisc: compute_co:  co"
         #print "podisc: compute_co: ", l
         #print "podisc: compute_co:  total", len (l)
 
-    def sat_encode (self, k) :
+class SAT_encoding (Base_encoding) :
+    def __init__ (self, unfolding) :
+        Base_encoding.__init__ (self, unfolding)
+        self.satf = None
+        self.k = -1
+
+    def encode (self, k) :
         self.satf = sat.Cnf ()
         self.k = k
 
@@ -150,9 +165,9 @@ class SmtEquivalenceEncoding :
                 if ei == ej : continue
                 for ek in self.unf.events :
                     if ek == ei or ek == ej : continue
-                    vij = self.satf.var (self.__ord_pair (ei, ej))
-                    vjk = self.satf.var (self.__ord_pair (ej, ek))
-                    vik = self.satf.var (self.__ord_pair (ei, ek))
+                    vij = self.satf.var (self.ord_pair (ei, ej))
+                    vjk = self.satf.var (self.ord_pair (ej, ek))
+                    vik = self.satf.var (self.ord_pair (ei, ek))
                     self.satf.add ([-vij, -vjk, vik])
                     #print "podisc: sat: clause", repr (ei), repr (ej), repr (ek), [-vij, -vjk, vik]
 
@@ -162,9 +177,9 @@ class SmtEquivalenceEncoding :
                 if ci == cj : continue
                 for ck in self.unf.conds :
                     if ck == ci or ck == cj : continue
-                    vij = self.satf.var (self.__ord_pair (ci, cj))
-                    vjk = self.satf.var (self.__ord_pair (cj, ck))
-                    vik = self.satf.var (self.__ord_pair (ci, ck))
+                    vij = self.satf.var (self.ord_pair (ci, cj))
+                    vjk = self.satf.var (self.ord_pair (cj, ck))
+                    vik = self.satf.var (self.ord_pair (ci, ck))
                     self.satf.add ([-vij, -vjk, vik])
                     #print "podisc: sat: clause", [-vij, -vjk, vik]
 
@@ -176,7 +191,7 @@ class SmtEquivalenceEncoding :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
                 if ei.label != ej.label :
-                    vij = self.satf.var (self.__ord_pair (ei, ej))
+                    vij = self.satf.var (self.ord_pair (ei, ej))
                     self.satf.add ([-vij])
         
     def __sat_encode_subset (self, setx, sety) :
@@ -193,7 +208,7 @@ class SmtEquivalenceEncoding :
             and_clause.append (-vx) # conjuntion of all or variables imply v
             clause = [-v]
             for y in sety :
-                vxy = self.satf.var (self.__ord_pair (x, y))
+                vxy = self.satf.var (self.ord_pair (x, y))
                 clause.append (vxy)
                 self.satf.add ([-vxy, vx]) # each or implies vx
             self.satf.add (clause)
@@ -210,7 +225,7 @@ class SmtEquivalenceEncoding :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
                 if ei.label != ej.label : continue # optimization
-                vij = self.satf.var (self.__ord_pair (ei, ej))
+                vij = self.satf.var (self.ord_pair (ei, ej))
 
                 # subset inclusion in both directions
                 v1 = self.__sat_encode_subset (ei.pre, ej.pre)
@@ -227,7 +242,7 @@ class SmtEquivalenceEncoding :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
                 if ei.label != ej.label : continue # optimization
-                vij = self.satf.var (self.__ord_pair (ei, ej))
+                vij = self.satf.var (self.ord_pair (ei, ej))
 
                 # subset inclusion in both directions
                 v1 = self.__sat_encode_subset (ei.post, ej.post)
@@ -240,7 +255,7 @@ class SmtEquivalenceEncoding :
     def __sat_encode_co (self) :
         self.__compute_co_relation ()
         for (c1, c2) in self.__co :
-            assert ((c1, c2) == self.__ord_pair (c1, c2))
+            assert ((c1, c2) == self.ord_pair (c1, c2))
             v = self.satf.var ((c1, c2))
             #print "podisc: sat: encode_co:", repr (c1), repr (c2)
             self.satf.add ([-v])
@@ -257,7 +272,7 @@ class SmtEquivalenceEncoding :
             for j in range (i + 1, len (self.unf.events)) :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
-                vij = self.satf.var (self.__ord_pair (ei, ej))
+                vij = self.satf.var (self.ord_pair (ei, ej))
 
                 intmap[ei].encode_eq (intmap[ej], vij)
 
@@ -272,6 +287,37 @@ class SmtEquivalenceEncoding :
 
     def __sat_encode_removal (self) :
         pass
+
+class SMT_base_encoding (Base_encoding) :
+    def __init__ (self, unfolding) :
+        Base_encoding.__init__ (self, unfolding)
+        self.z3 = None
+
+        # assert that the unfolding is in right shape and create the solver
+        self.__smt_assert_repr ()
+
+    def varmap (self, item) :
+        return z3.Int (repr (item))
+
+    def solve (self, timeout=-1) :
+        if timeout > 0 :
+            self.z3.set ("timeout", timeout)
+        result = self.z3.check ()
+        if result == z3.sat :
+            return SMT_base_encoding.SAT
+        elif result == z3.unsat :
+            return SMT_base_encoding.UNSAT
+        else :
+            assert (result == z3.unknown)
+            return SMT_base_encoding.UNDEF
+
+    def model (self) :
+        return self.z3.model ()
+
+    def stats (self) :
+        d = Base_encoding.stats (self)
+        d['z3.constaints'] = len (self.z3.assertions())
+        return d
 
     def __smt_assert_repr (self) :
 
@@ -291,38 +337,80 @@ class SmtEquivalenceEncoding :
         # not needed so far
         # for p in self.unf.net.places : assert (len (p.inverse_label) != 0)
 
-    def smt_encode_1 (self, k) :
+    def encode_subset (self, setx, sety, b = None) :
+        # each element of setx must be merged to some element of sety
+        # this function generates and returns a boolean variable that, if it is
+        # true, then subset inclusion happens
 
-        # assert that the unfolding is in right shape and create the solver
-        self.k = k
-        self.__smt_assert_repr ()
+        # optimization: those elements in setx that are also in sety can be
+        # omitted :)
+        setx = set (setx) - sety
+
+        l = []
+        for x in setx :
+            vx = self.varmap (x)
+            cons = z3.Or ([vx == self.varmap (y) for y in sety])
+            l.append (cons)
+        if b == None :
+            s = "merge-subset-%s-%s" % (repr (setx), repr (sety))
+            b = z3.Bool (s)
+        #print 'pod: subset: setx %s sety %s cons %s' % (setx, sety, l)
+        self.z3.add (z3.Implies (b, z3.And (l)))
+        return b
+
+class SMT_encoding_sp_distinct (SMT_base_encoding) :
+    def __init__ (self, unfolding) :
+        SMT_base_encoding.__init__ (self, unfolding)
+        self.k = -1
+
+    def encode (self) :
         self.z3 = z3.Solver ()
+        self.__encode_presets ()
+        #print 'encoding', self.z3
 
-        # equivalence: nothing to do !!
+    def __encode_presets (self) :
+        for a in self.unf.net.trans :
+            if len (a.inverse_label) == 0 :
+                continue
+            if len (a.inverse_label) == 1 :
+                e = next (iter (a.inverse_label))
+                if len (e.pre) < 2 : continue
+                cons = z3.Distinct ([self.varmap (c) for c in e.pre])
+                #print 'pod: alone: e %s cons %s' % (e, cons)
+                self.z3.add (cons)
+                continue
 
-        # IP : it preserves independence
-        self.__smt_encode_labels_1 ()
-        self.__smt_encode_pre_post ()
-        self.__smt_encode_co_1 ()
+            # for any set of events having at least two events and such that all
+            # are labelled by the same label
+            evs = list (a.inverse_label)
 
-        # RA: does not merge removed events
-        self.__smt_encode_removal ()
+            # i's preset is a subset of i+1's preset
+            for i in range (0, len (evs) - 1) :
+                e = evs[i]
+                ep = evs[i + 1]
+                self.encode_subset (e.pre, ep.pre, True)
 
-        # MET : the measure of the folded net is at most k
-        self.__smt_encode_measure_1 (k)
-        return
+            # and the last's preset is a subset of the first's
+            e = evs[len (evs) - 1]
+            self.encode_subset (e.pre, evs[0].pre, True)
 
-    def __smt_encode_labels_1 (self) :
-        for i in range (len (self.unf.events)) :
-            for j in range (i + 1, len (self.unf.events)) :
-                ei = self.unf.events[i]
-                ej = self.unf.events[j]
-                if ei.label != ej.label :
-                    x_ei = self.smt_varmap (ei)
-                    x_ej = self.smt_varmap (ej)
-                    self.z3.add (x_ei != x_ej)
+            # and the variables associated to the conditions of that preset that
+            # is the smallest one in evs, all of them are different (ie, none of
+            # them is merged with each other)
+            m = min (range (len (evs)), key = lambda i : len (evs[i].pre))
+            e = evs[m]
+            #print 'the event', e
+            if len (e.pre) < 2 : continue
+            cons = z3.Distinct ([self.varmap (c) for c in e.pre])
+            #print 'pod: min:', cons
+            self.z3.add (cons)
 
-    def __smt_encode_pre_post (self, which = "pre_and_post") :
+class SMT_base_encoding_ip (SMT_base_encoding) :
+    def __init__ (self, unfolding) :
+        SMT_base_encoding.__init__ (self, unfolding)
+        self.k = -1
+
+    def encode_pre_post (self, which = "pre_and_post") :
         for i in range (len (self.unf.events)) :
             for j in range (i + 1, len (self.unf.events)) :
                 ei = self.unf.events[i]
@@ -331,8 +419,8 @@ class SmtEquivalenceEncoding :
                 if ei.label != ej.label : continue # important optimization
                 #print "podisc: smt: pre_post: after!"
 
-                xi = self.smt_varmap (ei)
-                xj = self.smt_varmap (ej)
+                xi = self.varmap (ei)
+                xj = self.varmap (ej)
 
                 s = "merge-%s-%s-%s" % (which, repr (ei), repr (ej))
                 b = z3.Bool (s)
@@ -340,63 +428,82 @@ class SmtEquivalenceEncoding :
                 #b = (xi == xj)
 
                 if which in ["pre", "pre_and_post"] :
-                    self.__smt_encode_subset (ei.pre, ej.pre, b)
-                    self.__smt_encode_subset (ej.pre, ei.pre, b)
+                    self.encode_subset (ei.pre, ej.pre, b)
+                    self.encode_subset (ej.pre, ei.pre, b)
                 if which in ["post", "pre_and_post"] :
-                    self.__smt_encode_subset (ei.post, ej.post, b)
-                    self.__smt_encode_subset (ej.post, ei.post, b)
+                    self.encode_subset (ei.post, ej.post, b)
+                    self.encode_subset (ej.post, ei.post, b)
+
+    def encode_removal (self) :
+        pass
+
+class SMT_base_encoding_ip_1 (SMT_base_encoding_ip) :
+    def __init__ (self, unfolding) :
+        SMT_base_encoding_ip.__init__ (self, unfolding)
+
+    def encode (self, k) :
+
+        # this is the old smt_encode_1() method ;)
+        self.k = k
+        self.z3 = z3.Solver ()
+
+        # equivalence: nothing to do !!
+
+        # IP : it preserves independence
+        self.__encode_labels_1 ()
+        self.encode_pre_post ()
+        self.__smt_encode_co_1 ()
+
+        # RA: does not merge removed events
+        self.encode_removal ()
+
+        # MET : the measure of the folded net is at most k
+        self.__smt_encode_measure_1 (k)
+        return
+
+    def __encode_labels_1 (self) :
+        for i in range (len (self.unf.events)) :
+            for j in range (i + 1, len (self.unf.events)) :
+                ei = self.unf.events[i]
+                ej = self.unf.events[j]
+                if ei.label != ej.label :
+                    x_ei = self.varmap (ei)
+                    x_ej = self.varmap (ej)
+                    self.z3.add (x_ei != x_ej)
 
     def __smt_encode_co_1 (self) :
         self.__compute_co_relation ()
         for (c1, c2) in self.__co :
-            assert ((c1, c2) == self.__ord_pair (c1, c2))
+            assert ((c1, c2) == self.ord_pair (c1, c2))
 
-            x1 = self.smt_varmap (c1)
-            x2 = self.smt_varmap (c2)
+            x1 = self.varmap (c1)
+            x2 = self.varmap (c2)
 
             #print "podisc: sat: encode_co:", repr (c1), repr (c2)
             self.z3.add (x1 != x2)
 
-    def __smt_encode_removal (self) :
-        pass
-
     def __smt_encode_measure_1 (self, k) :
         # for each event e, x_e must be smaller or equal to k
         for e in self.unf.events :
-            x = self.smt_varmap (e)
+            x = self.varmap (e)
             self.z3.add (x < k)
             self.z3.add (0 <= x)
 
-    def __smt_encode_subset (self, setx, sety, b = None) :
-        # each element of setx must be merged to some element of sety
-        # this function generates and returns a boolean variable that, if it is
-        # true, then subset inclusion happens
-        l = []
-        for x in setx :
-            vx = self.smt_varmap (x)
-            cons = z3.Or ([vx == self.smt_varmap (y) for y in sety])
-            l.append (cons)
-        if b == None :
-            s = "merge-subset-%s-%s" % (repr (setx), repr (sety))
-            b = z3.Bool (s)
-        self.z3.add (z3.Implies (b, z3.And (l)))
-        return b
+class SMT_encoding_ip_2 (SMT_base_encoding_ip) :
+    def __init__ (self, unfolding) :
+        SMT_base_encoding_ip.__init__ (self, unfolding)
 
-    def smt_varmap (self, item) :
-        return z3.Int (repr (item))
+    def encode (self, k) :
 
-    def smt_encode_2 (self, k) :
-
-        # assert that the unfolding is in right shape and create the solver
+        # this is the old smt_encode_2() method ;)
         self.k = k
-        self.__smt_assert_repr ()
         self.z3 = z3.Solver ()
 
         # equivalence: nothing to do !!
 
         # IP : it preserves independence
         print "podisc: smt_2: presets + posets"
-        self.__smt_encode_pre_post ()
+        self.encode_pre_post ()
         print "podisc: smt_2: co"
         self.__smt_encode_co_2 ()
 
@@ -412,15 +519,15 @@ class SmtEquivalenceEncoding :
     def __smt_encode_co_2 (self) :
         self.__compute_co_relation ()
         for (c1, c2) in self.__co :
-            assert ((c1, c2) == self.__ord_pair (c1, c2))
+            assert ((c1, c2) == self.ord_pair (c1, c2))
 
             if not self.__smt_encode_co_2_need_to (c1, c2) :
                 #print "podisc: smt_2: co: not needed", repr (c1), repr (c2)
                 continue
 
             #print "podisc: smt_2: co: needed", repr (c1), repr (c2)
-            x1 = self.smt_varmap (c1)
-            x2 = self.smt_varmap (c2)
+            x1 = self.varmap (c1)
+            x2 = self.varmap (c2)
 
             #print "podisc: sat: encode_co:", repr (c1), repr (c2)
             self.z3.add (x1 != x2)
@@ -438,13 +545,13 @@ class SmtEquivalenceEncoding :
 
     def __smt_encode_measure_2 (self, k) :
         # the number of merged transitions in each label must be under k
-        self.z3.add (sum (self.smt_varmap (t) for t in self.unf.net.trans) <= k)
+        self.z3.add (sum (self.varmap (t) for t in self.unf.net.trans) <= k)
 
         # for each label, and each event e in h' (a)
         for t in self.unf.net.trans :
-            y = self.smt_varmap (t)
+            y = self.varmap (t)
             for e in t.inverse_label :
-                x = self.smt_varmap (e)
+                x = self.varmap (e)
                 self.z3.add (z3.And (0 <= x, x < y))
 
 # vi:ts=4:sw=4:et:
