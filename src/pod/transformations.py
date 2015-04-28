@@ -28,10 +28,13 @@ def __seq_to_pes (es, i, seq, indep) :
     elif i == 10 :
         print 'pod: log > pes: ... skipping debug info for remaining log sequences'
     c = es.get_empty_config ()
-    #print 'pes', es
     j = 0
+    #print 'pes', es
     for logev in seq :
         a = logev.action
+        #print '==============================='
+        #print "c", c
+        #print "a '%s' dependent with %s" % (a, indep.dependent_with (a))
         l = [e for e in c.enabled () if e.label == a]
         assert (len (l) == 0 or len (l) == 1)
         if l :

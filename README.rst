@@ -142,3 +142,8 @@ sp-pre
 
 
 - test that the sharing of ActionSets works in cmd_merge
+
+TODO
+----
+
+- improving extract-dependence (post \cap post is unnecessary)

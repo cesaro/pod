@@ -150,6 +150,8 @@ class Log :
         indep.from_depen (d)
         return indep
 
+    def __iter__ (self) :
+        return iter (self.traces)
     def __repr__ (self) :
         nre = sum (len (seq) for seq in self.traces)
         return "id %s, %d traces, %d events, %d actions" % \
@@ -235,6 +237,12 @@ class Indep (SymmetricRelation) :
         d = Depen (self.domain)
         d.from_file (l)
         self.from_depen (d)
+
+    def dependent_with (self, x) :
+        l = []
+        for y in self.domain :
+            if not self.get (x, y) : l.append (y)
+        return sorted (l, key = lambda z : z.name)
 
 class Depen (SymmetricRelation) :
     def __init__ (self, domain=None) :

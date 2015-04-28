@@ -280,22 +280,25 @@ class Configuration :
         m = self.pes.new_mark ()
         dep = []
         work = list (self.__max)
+        #print 'mark m', m
         while len (work) :
             e = work.pop ()
+            #print 'eval t "%s" e "%s"' % (t, e)
             assert (e.m != m)
             if not indep.get (e.label, t) :
                 dep.append (e)
                 continue
             e.m = m
             for ep in e.pre :
-                # ep is ready iff ep.post is all marked
+                # ep is ready iff ep.post \cap this config is all marked
                 found = False
-                for epp in ep.post :
+                for epp in ep.post & self.events:
                     if epp.m != m :
                         found = True
                         break
                 if not found :
                     work.append (ep)
+        #print 'return', dep
         return dep
 
     def is_ex (self, e) :

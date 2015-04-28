@@ -98,10 +98,10 @@ class Main :
         self.arg_log_path = ""
         self.arg_depen_path = ""
 
-        self.arg_log_trunc = -1
-        self.arg_log_only = []
-        self.arg_log_exclude = []
-        self.arg_log_negative = ""
+        self.arg_log_trunc = None     # integer
+        self.arg_log_only = None      # list
+        self.arg_log_exclude = None   # list
+        self.arg_log_negative = None  # path string
 
         self.arg_output_path = ""
         self.arg_eq = "id"
@@ -206,6 +206,8 @@ class Main :
 
         if self.arg_command == "extract-dependence" :
             self.cmd_extract_dependence ()
+        elif self.arg_command == "dump-log" :
+            self.cmd_dump_log ()
         elif self.arg_command == "merge" :
             self.cmd_merge ()
         else :
@@ -248,7 +250,17 @@ class Main :
         print "pod: extract: output saved to '%s'" % self.arg_output_path
 
     def cmd_dump_log (self) :
-        raise NotImplementedError
+        # load the positive and negative logs
+        self.__load_all_logs ()
+
+        print "pod: logs: dumping the positive log:\n"
+
+        i = 0
+        print " Idx Len Actions"
+        print "---- --- ----------------------------------------"
+        for seq in self.log_both :
+            print "%4d %3d %s" % (i, len (seq), seq)
+            i += 1
 
     def cmd_merge (self) :
 
@@ -301,6 +313,8 @@ class Main :
             nre = sum (len (seq) for seq in self.log.traces)
             print 'pod: logs: positive: new log: %d seq, %d log events, %d distinct actions' \
                     % (len (self.log.traces), nre, len (self.acset))
+        if self.arg_log_only != None or self.arg_log_exclude != None:
+            raise NotImplementedError
 
         # create another log to store positive and negative information and
         # set its actionset to the be the same as the positive log, so all
