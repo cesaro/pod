@@ -261,7 +261,7 @@ class Merging_equivalence_factory_sp :
         encoding = SMT_encoding_sp_distinct (unf)
         print 'pod: bp > net: building SMT encoding...'
         encoding.encode ()
-        result = encoding.solve (10 * 1000)
+        result = encoding.solve (30 * 1000)
         print 'pod: bp > net: solving, timeout 10s'
         if result == encoding.UNSAT :
             print 'pod: bp > net: UNSAT, cannot find a merging equivalence'

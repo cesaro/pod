@@ -298,6 +298,7 @@ class SMT_base_encoding (Base_encoding) :
 
     def varmap (self, item) :
         return z3.Int (repr (item))
+        #return z3.BitVec (repr (item), '12')
 
     def solve (self, timeout=-1) :
         if timeout > 0 :
@@ -403,6 +404,18 @@ class SMT_encoding_sp_distinct (SMT_base_encoding) :
             if len (e.pre) < 2 : continue
             cons = z3.Distinct ([self.varmap (c) for c in e.pre])
             #print 'pod: min:', cons
+            self.z3.add (cons)
+
+        # DEBUG experimental
+        for e in self.unf.events :
+            for c in e.pre :
+                for cp in e.post :
+                    v = self.varmap (c)
+                    vp = self.varmap (cp)
+                    self.z3.add (v != vp)
+        for i in range (15) :
+            cons = z3.Or ([i == self.varmap (c) for c in self.unf.conds])
+            #print 'xxx', cons
             self.z3.add (cons)
 
 class SMT_base_encoding_ip (SMT_base_encoding) :
