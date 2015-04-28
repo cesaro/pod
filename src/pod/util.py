@@ -50,6 +50,7 @@ def avg_iter (it) :
 def long_list (ls, maxlen=5) :
     ls = list (ls)
     le = len (ls)
+    if maxlen < 0 : maxlen = le
     s = "["
     s += ", ".join (repr (x) for x in ls[:maxlen])
     if le > maxlen :

@@ -254,15 +254,16 @@ class Merging_equivalence_factory_sp :
         return meq
 
     @staticmethod
-    def pre_distinct (unf) :
+    def pre_distinct (unf, min_places, timeout=30000) :
 
         # sp-pre-distinct
 
         encoding = SMT_encoding_sp_distinct (unf)
         print 'pod: bp > net: building SMT encoding...'
-        encoding.encode ()
-        result = encoding.solve (30 * 1000)
-        print 'pod: bp > net: solving, timeout 10s'
+        print 'pod: bp > net: min_places %d' % min_places
+        encoding.encode (min_places)
+        print 'pod: bp > net: solving with z3, timeout %ds ...' % (timeout / 1000)
+        result = encoding.solve (timeout)
         if result == encoding.UNSAT :
             print 'pod: bp > net: UNSAT, cannot find a merging equivalence'
             return None
@@ -276,8 +277,7 @@ class Merging_equivalence_factory_sp :
         for c in unf.conds :
             var = encoding.varmap (c)
             val = model[var].as_long () if model[var] != None else "??"
-            #print 'pod: %4s %s' % (val, c)
-
+            #print 'pod: model: %4s %s' % (val, c)
 
         # using the model, compute a merging equivalence
         domain = set (unf.events) | set (unf.conds)

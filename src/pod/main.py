@@ -408,7 +408,7 @@ class Main :
         elif self.arg_eq == "sp-pre-max" :
             self.meq = Merging_equivalence_factory_sp.pre_max (self.bp)
         elif self.arg_eq == "sp-pre-distinct" :
-            self.meq = Merging_equivalence_factory_sp.pre_distinct (self.bp)
+            self.meq = Merging_equivalence_factory_sp.pre_distinct (self.bp, 1, 40 * 1000)
         else :
             raise AssertionError, "Internal inconsistency"
 

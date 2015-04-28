@@ -218,9 +218,9 @@ def bp_to_net (unf, meq) :
             single_p.append (next (iter (eqclass)))
         else :
             print "pod: bp > net: * %d conds: %s" % \
-                    (len (eqclass), long_list (eqclass, 20))
+                    (len (eqclass), long_list (eqclass, -20))
     print "pod: bp > net: * ... %d conditions didn't merge: %s" % \
-            (len (single_p), long_list (single_p, 15))
+            (len (single_p), long_list (single_p, -15))
     print "pod: bp > net: summary: transitions: %d singleton classes, %d non-singleton" % \
             (len (single_t), len (net.trans) - len (single_t))
     print "pod: bp > net: summary: places: %d singleton classes, %d non-singleton" % \
