@@ -105,6 +105,11 @@ class Main :
 
         self.arg_output_path = ""
         self.arg_eq = "id"
+        self.arg_smt_timeout = 60
+        self.arg_smt_nr_places = None
+        self.arg_smt_pre_distinct = False
+        #self.arg_smt_merge_post = False
+        self.arg_smt_forbid_self = False
 
         self.acset = None
         self.log = None
@@ -131,7 +136,8 @@ class Main :
                 "sp-1place",
                 "sp-pre-singleton",
                 "sp-pre-max",
-                "sp-pre-distinct",
+                "sp-smt",
+                "sp-smt-post",
                 ]
         p = argparse.ArgumentParser (usage = __doc__, add_help=False)
         #p = argparse.ArgumentParser (usage=__doc__)
@@ -143,6 +149,11 @@ class Main :
         p.add_argument ("--log-exclude")
         p.add_argument ("--output")
         p.add_argument ("--eq", choices=eq_choices, default="id")
+        p.add_argument ("--smt-timeout", type=int, default=60)
+        p.add_argument ("--smt-nr-places", type=int)
+        p.add_argument ("--smt-pre-distinct", action="store_true")
+        #p.add_argument ("--smt-merge-post", action="store_true")
+        p.add_argument ("--smt-forbid-self", action="store_true")
         #p.add_argument ("--format", choices=["pdf","dot","pnml"])
 
         p.add_argument ('cmd', metavar="COMMAND", choices=cmd_choices)
@@ -162,6 +173,11 @@ class Main :
         self.arg_log_path = args.log_pnml
         self.arg_log_trunc = args.log_truncate
         self.arg_log_negative = args.log_negative
+        self.arg_smt_timeout = args.smt_timeout
+        self.arg_smt_nr_places = args.smt_nr_places
+        self.arg_smt_pre_distinct = args.smt_pre_distinct
+        #self.arg_smt_merge_post = args.smt_merge_post
+        self.arg_smt_forbid_self = args.smt_forbid_self
 
         if self.arg_command not in ["extract-dependence", "dump-log"] :
             if self.arg_depen_path == None :
@@ -196,13 +212,19 @@ class Main :
                     "arg_log_only",
                     "arg_log_exclude",
                     "arg_log_negative",
-                    "arg_output_path",
+                    "arg_smt_timeout",
+                    "arg_smt_pre_distinct",
+                    #"arg_smt_merge_post",
+                    "arg_smt_forbid_self",
+                    "arg_smt_nr_places",
                     "arg_eq",
+                    "arg_output_path",
                     ] :
-            output_pair (sys.stdout, opt, self.__dict__[opt], 16, "pod: ")
+            output_pair (sys.stdout, opt, self.__dict__[opt], 20, "pod: ")
 
     def main (self) :
         self.parse_cmdline_args ()
+        #sys.exit (0)
 
         if self.arg_command == "extract-dependence" :
             self.cmd_extract_dependence ()
@@ -407,8 +429,20 @@ class Main :
             self.meq = Merging_equivalence_factory_sp.pre_singleton (self.bp)
         elif self.arg_eq == "sp-pre-max" :
             self.meq = Merging_equivalence_factory_sp.pre_max (self.bp)
-        elif self.arg_eq == "sp-pre-distinct" :
-            self.meq = Merging_equivalence_factory_sp.pre_distinct (self.bp, 1, 40 * 1000)
+        elif self.arg_eq == "sp-smt" :
+            self.meq = Merging_equivalence_factory_sp.pre_smt (self.bp, \
+                    self.arg_smt_timeout * 1000,
+                    self.arg_smt_nr_places,
+                    self.arg_smt_forbid_self,
+                    self.arg_smt_pre_distinct,
+                    False)
+        elif self.arg_eq == "sp-smt-post" :
+            self.meq = Merging_equivalence_factory_sp.pre_smt (self.bp, \
+                    self.arg_smt_timeout * 1000,
+                    self.arg_smt_nr_places,
+                    self.arg_smt_forbid_self,
+                    self.arg_smt_pre_distinct,
+                    True)
         else :
             raise AssertionError, "Internal inconsistency"
 

@@ -208,17 +208,22 @@ def bp_to_net (unf, meq) :
     # merge conditions
     print 'pod: bp > net: folding conditions:'
     single_p = []
+    i = 0
     for eqclass in meq.classes () :
         assert (len (eqclass) >= 1)
         c = next (iter (eqclass))
         if not isinstance (c, ptnet.Condition) : continue
-        p = net.place_add (long_list (eqclass, 2))
+        #p = net.place_add (long_list (eqclass, 2))
+        #p = net.place_add (repr (c))
+        p = net.place_add ('p%d' % i)
+        i += 1
         for c in eqclass : c2p[c] = p
         if len (eqclass) == 1 :
             single_p.append (next (iter (eqclass)))
         else :
             print "pod: bp > net: * %d conds: %s" % \
-                    (len (eqclass), long_list (eqclass, -20))
+                    (len (eqclass), long_list (eqclass, 20))
+
     print "pod: bp > net: * ... %d conditions didn't merge: %s" % \
             (len (single_p), long_list (single_p, -15))
     print "pod: bp > net: summary: transitions: %d singleton classes, %d non-singleton" % \

@@ -1,4 +1,7 @@
 
+import sys
+import time
+
 import sat
 import ptnet
 import z3
@@ -303,9 +306,19 @@ class SMT_base_encoding (Base_encoding) :
         #return z3.BitVec (repr (item), '12')
 
     def solve (self, timeout=-1) :
+        tstr = 'timeout %ds' % (timeout / 1000) if timeout > 0 else "no timeout"
+        print 'pod: bp > net: smt: solving with z3, %s ...' % tstr
         if timeout > 0 :
-            self.z3.set ("timeout", timeout)
+            if 'darwin' in sys.platform :
+                self.z3.set ("soft_timeout", timeout)
+            else :
+                self.z3.set ("timeout", timeout)
+
+        t1 = time.time ()
         result = self.z3.check ()
+        t2 = time.time ()
+        print 'pod: bp > net: smt: done, %s, %.2fs' % (result, t2 - t1)
+
         if result == z3.sat :
             return SMT_base_encoding.SAT
         elif result == z3.unsat :
@@ -361,8 +374,15 @@ class SMT_base_encoding (Base_encoding) :
         self.z3.add (z3.Implies (b, z3.And (l)))
         return b
 
+    def all_distinct (self, items) :
+        if len (items) <= 1 : return
+        #print 'pod: distinct:', items
+        cons = z3.Distinct ([self.varmap (x) for x in items])
+        self.z3.add (cons)
+
     def forbid_self_loops (self) :
         for e in self.unf.events :
+            #print 'pod: forbid_self_loops:', e
             for c in e.pre :
                 for cp in e.post :
                     v = self.varmap (c)
@@ -373,25 +393,34 @@ class SMT_base_encoding (Base_encoding) :
 class SMT_encoding_sp_distinct (SMT_base_encoding) :
     def __init__ (self, unfolding) :
         SMT_base_encoding.__init__ (self, unfolding)
-        self.k = -1
 
-    def encode (self, min_places) :
+    def encode (self, nr_places=None, forbid_self=False, pre_distinct=False, want_post=False) :
+
+        print 'pod: bp > net: smt: params: nr_places        :', nr_places
+        print 'pod: bp > net: smt: params: pre_distinct     :', pre_distinct
+        print 'pod: bp > net: smt: params: want_post        :', want_post
+        print 'pod: bp > net: smt: params: forbid_self_loops:', forbid_self
+        self.__stats ()
+
         self.z3 = z3.Solver ()
-        self.__test ()
-        #self.forbid_self_loops ()
-        #self.__encode_canonical_guy (min_places)
-        #self.__encode_presets ()
+        self.__canonical_guy_fixed (nr_places, pre_distinct, want_post)
+        if forbid_self :
+            self.forbid_self_loops ()
         #print 'encoding', self.z3
 
     def __stats (self) :
         for a in self.unf.net.trans :
             pres = [len (e.pre) for e in a.inverse_label]
-            mi = min (pres)
-            ma = max (pres)
-            print "pod: ac '%s' evs  %s" % (a, long_list (a.inverse_label, 25))
+            posts = [len (e.post) for e in a.inverse_label]
+            pre_mi = min (pres)
+            pre_ma = max (pres)
+            post_mi = min (posts)
+            post_ma = max (posts)
+            print "pod: ac '%s' count %d events  %s" % \
+                    (a, len (a.inverse_label), long_list (a.inverse_label, 15))
             #print "pod:    '%s' pres %s" % (a, long_list (pres, -25))
-            print "pod:    '%s' min,max = %d,%d" % (a, mi, ma)
-            print "pod:    '%s' count %d" % (a, len (a.inverse_label))
+            print "pod:    '%s' pre : min,max = %d,%d" % (a, pre_mi, pre_ma)
+            print "pod:    '%s' post: min,max = %d,%d" % (a, post_mi, post_ma)
 
         for c in self.unf.conds :
             assert (len (c.post) >= 1)
@@ -408,7 +437,7 @@ class SMT_encoding_sp_distinct (SMT_base_encoding) :
                 if len (e.pre) < 2 : continue
                 cons = z3.Distinct ([self.varmap (c) for c in e.pre])
                 #print 'pod: alone: e %s cons %s' % (e, cons)
-                self.z3.add (cons)
+                #self.z3.add (cons)
                 continue
 
             # find canonical
@@ -417,10 +446,11 @@ class SMT_encoding_sp_distinct (SMT_base_encoding) :
             e = evs[m]
             canonical[a] = e
 
+            # require all conditions in preset are distinct
             if len (e.pre) >= 2 :
                 cons = z3.Distinct ([self.varmap (c) for c in e.pre])
                 #print 'pod: min:', cons
-                self.z3.add (cons)
+                #self.z3.add (cons)
 
             # subsets
             for i in range (0, len (evs) - 1) :
@@ -434,7 +464,7 @@ class SMT_encoding_sp_distinct (SMT_base_encoding) :
 
 
         # print canonicals
-        for a,e in canonical.items () : print 'canonical a "%s" e %s' % (a, e)
+        for a,e in canonical.items () : print 'pod: canonical a "%s" e %s' % (a, e)
         s = set ()
         for e in canonical.values () : s |= e.pre
 
@@ -450,7 +480,38 @@ class SMT_encoding_sp_distinct (SMT_base_encoding) :
             #print 'xxx', cons
             self.z3.add (cons)
 
-    def __encode_canonical_guy (self, min_places) :
+    def __circular_subset_constraint (self, events, pre=True, post=False) :
+        # encode that all presets (postsets) in events give rise to the same set
+        # of equivalence classes
+
+        print 'pod: circular: pre %s post %s events %s' % (pre, post, long_list (events, 10))
+
+        # nothing to do if there is exactly 1 event
+        if len (events) == 1 : return
+        if (not pre) and (not post) : return
+
+        # i's preset is a subset of i+1's preset
+        for i in range (0, len (events) - 1) :
+            e = events[i]
+            ep = events[i + 1]
+            if pre :
+                self.encode_subset (e.pre, ep.pre, True)
+            if post :
+                self.encode_subset (e.post, ep.post, True)
+
+        # and the last's preset is a subset of the first's
+        e = events[-1]
+        if pre :
+            self.encode_subset (e.pre, events[0].pre, True)
+        if post :
+            self.encode_subset (e.post, events[0].post, True)
+
+    def __canonical_guy_fixed (self, nr_places=None, distinct=False, want_post=False) :
+        # do the fixed encoding of the ``canonical guy'', requiesting that the
+        # number of places is "nr_places", asking that presets of canonical guys
+        # do not merge iff "distinct" is True, and generating constraints to
+        # merge also the postset if "want_post" is True
+
         canonical = {}
         for a in self.unf.net.trans :
             if len (a.inverse_label) == 0 :
@@ -458,10 +519,8 @@ class SMT_encoding_sp_distinct (SMT_base_encoding) :
             if len (a.inverse_label) == 1 :
                 e = next (iter (a.inverse_label))
                 canonical[a] = e
-                if len (e.pre) < 2 : continue
-                cons = z3.Distinct ([self.varmap (c) for c in e.pre])
-                #print 'pod: alone: e %s cons %s' % (e, cons)
-                self.z3.add (cons)
+                if distinct:
+                    self.all_distinct (e.pre)
                 continue
 
             # for any set of events having at least two events and such that all
@@ -469,92 +528,48 @@ class SMT_encoding_sp_distinct (SMT_base_encoding) :
             evs = list (a.inverse_label)
 
             # find the canonical representative (that one in evs that has a
-            # preset of minmal size)
+            # preset of minimal size)
             m = min (range (len (evs)), key = lambda i : len (evs[i].pre))
             e = evs[m]
             canonical[a] = e
 
             # the variables of conditions in the preset of the canonincal's
             # preset are all different
-            #print 'canonical', e
-            if len (e.pre) >= 2 :
-                cons = z3.Distinct ([self.varmap (c) for c in e.pre])
-                #print 'pod: min:', cons
-                self.z3.add (cons)
+            if distinct:
+                self.all_distinct (e.pre)
 
             # encode that all presets in the inverse_label give rise to the same
-            # set of equivalence classes
-            # i's preset is a subset of i+1's preset
-            for i in range (0, len (evs) - 1) :
-                e = evs[i]
-                ep = evs[i + 1]
-                self.encode_subset (e.pre, ep.pre, True)
+            # set of equivalence classes (possibly also for postsets)
+            self.__circular_subset_constraint (evs, True, want_post)
 
-            # and the last's preset is a subset of the first's
-            e = evs[len (evs) - 1]
-            self.encode_subset (e.pre, evs[0].pre, True)
+        # print canonicals
+        for e in canonical.values () : print "pod: canonical:", e
 
-        for c in self.unf.conds :
-            assert (len (c.post) >= 1)
+        # we rely on this if there we've been requested an exact number of
+        # places (if all conditions are in a preset, then they will be
+        # equivalent to some canonical preset)
+        if nr_places != None :
+            for c in self.unf.conds :
+                assert (len (c.post) >= 1)
 
-        # now, there is at least min_places generated, for which we enforce that
-        # the preset of the canonical guys
-        #print 'canonicals', canonical
-        for a,e in canonical.items () : print 'canonical a "%s" e %s' % (a, e)
-        s = set ()
-        for e in canonical.values () : s |= e.pre
+        # get the list of canonical conditions ("the places")
+        canonical_conds = set ()
+        for e in canonical.values () : canonical_conds |= e.pre
 
-        return
-        for i in range (min_places) :
-            cons = z3.Or ([i == self.varmap (c) for c in s])
-            #print 'xxx', cons
-            self.z3.add (cons)
-            self.z3.add (0 <= self.varmap (c))
-            self.z3.add (self.varmap (c) < min_places)  #FIXME why this doesn't work?
+        # all of them are >= 0; we conditionally require them to be <= nr_places
+        for c in canonical_conds :
+            v = self.varmap (c)
+            self.z3.add (v >= 0)
+            if nr_places != None :
+                self.z3.add (v < nr_places)
+                #print 'pod: upper bound:', v < nr_places
 
-    def __encode_presets (self) :
-        # XXX -
-        # this is a primitive version of the __encode_canonical_guy
-        for a in self.unf.net.trans :
-            if len (a.inverse_label) == 0 :
-                continue
-            if len (a.inverse_label) == 1 :
-                e = next (iter (a.inverse_label))
-                if len (e.pre) < 2 : continue
-                cons = z3.Distinct ([self.varmap (c) for c in e.pre])
-                #print 'pod: alone: e %s cons %s' % (e, cons)
+        # for each i there is at least one canonical condition
+        if nr_places != None :
+            for i in range (nr_places) :
+                cons = z3.Or ([i == self.varmap (c) for c in canonical_conds])
                 self.z3.add (cons)
-                continue
-
-            # for any set of events having at least two events and such that all
-            # are labelled by the same label
-            evs = list (a.inverse_label)
-
-            # i's preset is a subset of i+1's preset
-            for i in range (0, len (evs) - 1) :
-                e = evs[i]
-                ep = evs[i + 1]
-                self.encode_subset (e.pre, ep.pre, True)
-
-            # and the last's preset is a subset of the first's
-            e = evs[len (evs) - 1]
-            self.encode_subset (e.pre, evs[0].pre, True)
-
-            # and the variables associated to the conditions of that preset that
-            # is the smallest one in evs, all of them are different (ie, none of
-            # them is merged with each other)
-            m = min (range (len (evs)), key = lambda i : len (evs[i].pre))
-            e = evs[m]
-            #print 'the event', e
-            if len (e.pre) < 2 : continue
-            cons = z3.Distinct ([self.varmap (c) for c in e.pre])
-            #print 'pod: min:', cons
-            self.z3.add (cons)
-
-        for i in range (15) :
-            cons = z3.Or ([i == self.varmap (c) for c in self.unf.conds])
-            #print 'xxx', cons
-            self.z3.add (cons)
+                #print 'pod: lower bound:', cons
 
 class SMT_base_encoding_ip (SMT_base_encoding) :
     def __init__ (self, unfolding) :

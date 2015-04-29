@@ -254,30 +254,28 @@ class Merging_equivalence_factory_sp :
         return meq
 
     @staticmethod
-    def pre_distinct (unf, min_places, timeout=30000) :
+    def pre_smt (unf, timeout=30000, \
+            nr_places=None, forbid_self=False, pre_distinct=False, want_post=False) :
 
         # sp-pre-distinct
 
         encoding = SMT_encoding_sp_distinct (unf)
         print 'pod: bp > net: building SMT encoding...'
-        print 'pod: bp > net: min_places %d' % min_places
-        encoding.encode (min_places)
-        print 'pod: bp > net: solving with z3, timeout %ds ...' % (timeout / 1000)
+        encoding.encode (nr_places, forbid_self, pre_distinct, want_post)
         result = encoding.solve (timeout)
         if result == encoding.UNSAT :
-            print 'pod: bp > net: UNSAT, cannot find a merging equivalence'
+            print 'pod: bp > net: smt: UNSAT, cannot find a merging equivalence'
             return None
         if result == encoding.UNDEF :
-            print 'pod: bp > net: UNDEF, cannot find a merging equivalence'
+            print 'pod: bp > net: smt: UNDEF, cannot find a merging equivalence'
             return None
-        print 'pod: bp > net: SAT, building merging equivalence'
+        print 'pod: bp > net: smt: SAT, building merging equivalence'
 
         model = encoding.model ()
-        #print 'pod: entire model', model
-        for c in unf.conds :
-            var = encoding.varmap (c)
-            val = model[var].as_long () if model[var] != None else "??"
-            #print 'pod: model: %4s %s' % (val, c)
+        #for c in unf.conds :
+        #    var = encoding.varmap (c)
+        #    val = model[var].as_long () if model[var] != None else "??"
+        #    print 'pod: bp > net: smt: model: %4s %s' % (val, c)
 
         # using the model, compute a merging equivalence
         domain = set (unf.events) | set (unf.conds)
