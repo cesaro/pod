@@ -33,6 +33,9 @@ where OPTIONS is zero or more of the following options
  --log-negative=LOGFILE
    Provides a negative log to the tool.
 
+ --smt-timeout=N
+   When using z3, abort SMT solving after N seconds.
+
  --output=OUTPUTPATH
    Save the output of the command to OUTPUTPATH
 
@@ -60,7 +63,20 @@ where OPTIONS is zero or more of the following options
      as possible.
      Ignores negative information.
 
-   * sp-pre-distinct
+   * sp-smt
+     Merges all events with same label into 1 single transition.
+     Ignores negative information.
+     If it merges two events, it also merges the preset of one with the preset
+     of the other. Accepts many options:
+     --smt-nr-places    : exact number of places on the final net
+     --smt-pre-distinct : require transition presets to be as large as possible
+     --smt-forbid-self  : forbids the presence of self loops
+
+   * sp-smt-post
+     Like 'sp-smt' but additionally merging event postsets.
+     That is, if two events are merged, then the postset of one is merged with
+     the postset of the other.
+     Accepts the same options than 'sp-smt'.
 """
 
 try :
