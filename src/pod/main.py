@@ -36,6 +36,9 @@ where OPTIONS is zero or more of the following options
  --smt-timeout=N
    When using z3, abort SMT solving after N seconds.
 
+ --no-asserts
+   Disables defensive programming verifications.
+
  --output=OUTPUTPATH
    Save the output of the command to OUTPUTPATH
 
@@ -121,6 +124,7 @@ class Main :
 
         self.arg_output_path = ""
         self.arg_eq = "id"
+        self.arg_no_asserts = False
         self.arg_smt_timeout = 60
         self.arg_smt_nr_places = None
         self.arg_smt_pre_distinct = False
@@ -163,6 +167,7 @@ class Main :
         p.add_argument ("--log-only")
         p.add_argument ("--log-negative")
         p.add_argument ("--log-exclude")
+        p.add_argument ("--no-asserts", action="store_true")
         p.add_argument ("--output")
         p.add_argument ("--eq", choices=eq_choices, default="id")
         p.add_argument ("--smt-timeout", type=int, default=60)
@@ -194,6 +199,7 @@ class Main :
         self.arg_smt_pre_distinct = args.smt_pre_distinct
         #self.arg_smt_merge_post = args.smt_merge_post
         self.arg_smt_forbid_self = args.smt_forbid_self
+        self.arg_no_asserts = args.no_asserts
 
         if self.arg_command not in ["extract-dependence", "dump-log"] :
             if self.arg_depen_path == None :
@@ -223,6 +229,7 @@ class Main :
         for opt in [
                     "arg_command",
                     "arg_depen_path",
+                    "arg_no_asserts",
                     "arg_log_path",
                     "arg_log_trunc",
                     "arg_log_only",
@@ -471,6 +478,9 @@ class Main :
         self.net = net
 
         # verify transformations
-        bp_to_net_assert_sp (self.bp, self.meq, e2t, c2p)
+        if self.arg_no_asserts :
+            print 'pod: bp > net: asserting correctness: skipping !!'
+        else :
+            bp_to_net_assert_sp (self.bp, self.meq, e2t, c2p)
 
 # vi:ts=4:sw=4:et:
