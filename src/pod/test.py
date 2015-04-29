@@ -465,5 +465,25 @@ def test18 () :
     #unf.write ('unf.dot', 'dot', m)
     unf.write ('unf.dot', 'dot')
 
+def test19 () :
+    
+    x = z3.Int ('x')
+    y = z3.Int ('y')
+    z = z3.Int ('z')
+    s = z3.Solver ()
+
+    cons = z3.Or ([])
+    print 'cons', cons
+    print 'simplify', z3.simplify (cons)
+    s.add (cons)
+    s.add (z3.Or (x == y, x == z))
+
+    print 'constraints to solve:', s
+
+    c = s.check ()
+    print 'result:', c
+    if c == z3.sat :
+        m = s.model ()
+        print 'model:', m
 
 # vi:ts=4:sw=4:et:

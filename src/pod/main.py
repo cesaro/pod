@@ -327,7 +327,8 @@ class Main :
 
         # build the BP
         print "pod: building the BP from the PES..."
-        self.bp = pes_to_bp (self.pes, self.indep)
+        want_max_conds = self.arg_eq == 'sp-smt-post' or self.arg_eq == 'ip-smt'
+        self.bp = pes_to_bp (self.pes, self.indep, want_max_conds)
 
         # merge the BP into a net
         self.__merge ()
@@ -447,20 +448,20 @@ class Main :
             domain = set (self.bp.events) | set (self.bp.conds)
             self.meq = IdentityMergingEquivalence (domain)
         elif self.arg_eq == "sp-1place" :
-            self.meq = Merging_equivalence_factory_sp.one_place (self.bp)
+            self.meq = Merging_equivalence_factory.sp_one_place (self.bp)
         elif self.arg_eq == "sp-pre-singleton" :
-            self.meq = Merging_equivalence_factory_sp.pre_singleton (self.bp)
+            self.meq = Merging_equivalence_factory.sp_pre_singleton (self.bp)
         elif self.arg_eq == "sp-pre-max" :
-            self.meq = Merging_equivalence_factory_sp.pre_max (self.bp)
+            self.meq = Merging_equivalence_factory.sp_pre_max (self.bp)
         elif self.arg_eq == "sp-smt" :
-            self.meq = Merging_equivalence_factory_sp.pre_smt (self.bp, \
+            self.meq = Merging_equivalence_factory.sp_smt (self.bp, \
                     self.arg_smt_timeout * 1000,
                     self.arg_smt_nr_places,
                     self.arg_smt_forbid_self,
                     self.arg_smt_pre_distinct,
                     False)
         elif self.arg_eq == "sp-smt-post" :
-            self.meq = Merging_equivalence_factory_sp.pre_smt (self.bp, \
+            self.meq = Merging_equivalence_factory.sp_smt (self.bp, \
                     self.arg_smt_timeout * 1000,
                     self.arg_smt_nr_places,
                     self.arg_smt_forbid_self,

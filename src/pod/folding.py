@@ -151,10 +151,10 @@ class SmtEquivalenceFinder :
         self.net = net
         return net
 
-class Merging_equivalence_factory_sp :
+class Merging_equivalence_factory :
 
     @staticmethod
-    def one_place (unf) :
+    def sp_one_place (unf) :
 
         # sp-1place
         # merges all events with same label
@@ -175,7 +175,7 @@ class Merging_equivalence_factory_sp :
         return meq
 
     @staticmethod
-    def pre_singleton (unf) :
+    def sp_pre_singleton (unf) :
 
         # sp-pre-singleton
         # merges all events with same label
@@ -211,7 +211,7 @@ class Merging_equivalence_factory_sp :
         return meq
 
     @staticmethod
-    def pre_max (unf) :
+    def sp_pre_max (unf) :
 
         # sp-pre-max
         # Merges all events with same label into 1 single transition.
@@ -254,14 +254,29 @@ class Merging_equivalence_factory_sp :
         return meq
 
     @staticmethod
-    def pre_smt (unf, timeout=30000, \
-            nr_places=None, forbid_self=False, pre_distinct=False, want_post=False) :
+    def sp_smt (unf, timeout=30000, \
+            nr_places=None, forbid_self=False, pre_distinct=False, merge_post=False) :
 
-        # sp-pre-distinct
+        # sp-smt
 
-        encoding = SMT_encoding_sp_distinct (unf)
         print 'pod: bp > net: building SMT encoding...'
-        encoding.encode (nr_places, forbid_self, pre_distinct, want_post)
+        encoding = SMT_encoding_sp (unf)
+        encoding.encode (nr_places, forbid_self, pre_distinct, merge_post)
+        return Merging_equivalence_factory.__smt_solve_merge_all_evs (unf, encoding, timeout)
+
+    @staticmethod
+    def ip_smt (unf, indep, timeout=30000, \
+            nr_places=None, forbid_self=False, pre_distinct=False) :
+
+        # ip-smt
+
+        print 'pod: bp > net: building SMT encoding...'
+        encoding = SMT_encoding_ip_3 (unf)
+        encoding.encode (indep, nr_places, forbid_self, pre_distinct)
+        return Merging_equivalence_factory.__smt_solve_merge_all_evs (unf, encoding, timeout)
+
+    @staticmethod
+    def __smt_solve_merge_all_evs (unf, encoding, timeout) :
         result = encoding.solve (timeout)
         if result == encoding.UNSAT :
             print 'pod: bp > net: smt: UNSAT, cannot find a merging equivalence'

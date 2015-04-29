@@ -51,7 +51,7 @@ def __seq_to_pes (es, i, seq, indep) :
         j += 1
 
 
-def pes_to_bp (es, indep) :
+def pes_to_bp (es, indep, want_max_conds=False) :
     unf = ptnet.Unfolding ()
 
     # generate the events of the unfolding
@@ -71,10 +71,21 @@ def pes_to_bp (es, indep) :
     pre_tab = __pes_to_bp_gen_conds_pre_clique_based (es, unf, ev_tab, pre_tab, indep)
     #pre_tab = __pes_to_bp_gen_conds_pre (es, unf, ev_tab, pre_tab)
 
+    # for every maximal event, generate a single condition in the postset
+    if want_max_conds :
+        __pes_to_bp_gen_max_conds (es, unf)
+
     # we are done!
-    print "pod: pes > bp: done, %d events, %d conditions" % \
-            (len (unf.events), len (unf.conds))
+    s = "with" if want_max_conds else "without"
+    print "pod: pes > bp: done, %d events, %d conditions, %s maximal conds" % \
+            (len (unf.events), len (unf.conds), s)
     return unf
+
+def __pes_to_bp_gen_max_conds (es, unf) :
+    print 'pod: pes > bp: generating maximal conditions'
+    for e in unf.events :
+        if len (e.post) == 0 :
+            c = unf.cond_add (None, [e])
 
 def __pes_to_bp_gen_events (es, unf) :
     # translate all events, collect an action set and store it in
