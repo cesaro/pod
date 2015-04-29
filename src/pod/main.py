@@ -221,7 +221,7 @@ class Main :
         else :
             d = {
                 "extract-dependence" : "dependence.txt",
-                "dump-pes"           : "pes.pdf",
+                "dump-pes"           : "pes.dot",
                 "dump-bp"            : "bp.pdf",
                 "dump-encoding"      : "encoding.smt2",
                 "merge"              : "output.pnml"}
@@ -253,6 +253,8 @@ class Main :
             self.cmd_extract_dependence ()
         elif self.arg_command == "dump-log" :
             self.cmd_dump_log ()
+        elif self.arg_command == "dump-pes" :
+            self.cmd_dump_pes ()
         elif self.arg_command == "merge" :
             self.cmd_merge ()
         else :
@@ -306,6 +308,28 @@ class Main :
         for seq in self.log_both :
             print "%4d %3d %s" % (i, len (seq), seq)
             i += 1
+
+    def cmd_dump_pes (self) :
+        # same as dump log but with the pes
+        # load the positive and negative logs
+        self.__load_all_logs ()
+
+        # load the independence relation
+        self.__load_indep ()
+
+        # build the PES
+        print "pod: building the PES from the logs..."
+        self.pes = log_to_pes (self.log_both, self.indep)
+
+        print "pod: logs: dumping the PES in dot format ..."
+        # save the net
+        try :
+            f = open (self.arg_output_path, "w")
+            self.pes.write (f, 'dot')
+            f.close ()
+        except Exception as (e, m) :
+            raise Exception, "'%s': %s" % (self.arg_output_path, m)
+        print "pod: result PES saved to '%s'" % self.arg_output_path
 
     def cmd_merge (self) :
 
