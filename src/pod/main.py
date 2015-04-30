@@ -26,6 +26,9 @@ The OPTIONS above is zero or more of the following options:
    can be very useful for understanding the transformation performed by the
    tool.
 
+ --log-fraction-truncate=N
+   If the log has x sequences, it uses only the first x*(N/100) sequences of it.
+
  --log-only=N1,N2,...
    Uses only sequences N1, N2, ... of the log to perform the synthesis. The
    argument is a comma-separated list of integers indicating the position in
@@ -47,6 +50,10 @@ The OPTIONS above is zero or more of the following options:
 
  --output=OUTPUTPATH
    Save the output of the command to OUTPUTPATH
+
+ --log-unique
+   Prior to any usage (or truncation) of the log, it discards duplicate log
+   sequences.
 
  --eq=ID
    Instructs the tool to use the folding equivalence identified by ID. The
@@ -187,6 +194,8 @@ class Main :
         p.add_argument ("-h", "--help", action="store_true")
         #g = p.add_mutually_exclusive_group ()
         p.add_argument ("--log-truncate", type=int)
+        p.add_argument ("--log-fraction-truncate", type=float)
+        p.add_argument ("--log-unique", action="store_true")
         p.add_argument ("--log-only")
         p.add_argument ("--log-negative")
         p.add_argument ("--log-exclude")
@@ -218,6 +227,8 @@ class Main :
         self.arg_eq = args.eq
         self.arg_log_path = args.log_pnml
         self.arg_log_trunc = args.log_truncate
+        self.arg_log_trunc_frac = args.log_fraction_truncate
+        self.arg_log_unique = args.log_unique
         self.arg_log_negative = args.log_negative
         self.arg_smt_timeout = args.smt_timeout
         self.arg_smt_pre_distinct = args.smt_pre_distinct
@@ -225,12 +236,17 @@ class Main :
         self.arg_smt_forbid_self = args.smt_forbid_self
         self.arg_no_asserts = args.no_asserts
 
+        # nr-places translates to min-places and max-places
         if args.smt_nr_places != None :
             self.arg_smt_min_places = args.smt_nr_places
             self.arg_smt_max_places = args.smt_nr_places
         else :
             self.arg_smt_min_places = args.smt_min_places
             self.arg_smt_max_places = args.smt_max_places
+
+        # at most one of log-trunc and log-trunc-frac
+        if self.arg_log_trunc_frac != None and self.arg_log_trunc != None :
+                raise Exception, "At most one of --log-truncate and --log-fraction-truncate"
 
         if self.arg_command not in ["extract-dependence", "dump-log", "net-stats"] :
             if self.arg_depen_path == None :
@@ -475,7 +491,24 @@ class Main :
         self.log = self.__load_log (self.arg_log_path, \
                 "pod: logs: positive: ")
 
-        # truncate the log according to options --log-{first,only,exclude}
+        # discard duplicated sequences if requested
+        if self.arg_log_unique :
+            print "pod: logs: positive: discarding duplicated sequences"
+            self.log.discard_duplicates ()
+            nre = sum (len (seq) for seq in self.log.traces)
+            print 'pod: logs: positive: new log: %d seq, %d log events, %d distinct actions' \
+                    % (len (self.log.traces), nre, len (self.acset))
+
+        # translate --log-trunc-frac to --log-trunc
+        assert (len (self.log) == len (self.log.traces))
+        assert (self.arg_log_trunc_frac == None or self.arg_log_trunc == None)
+        if self.arg_log_trunc_frac :
+            print "pod: logs: positive: truncating: keeping only first %.2f%% log seqs" % \
+                    self.arg_log_trunc_frac
+            n = len (self.log) * float (self.arg_log_trunc_frac) / 100
+            self.arg_log_trunc = int (n)
+
+        # truncate the log according to options --log-{trunc,only,exclude,trunc-fraction}
         if self.arg_log_trunc != None :
             print "pod: logs: positive: truncating: keeping only first %d seq" \
                 % self.arg_log_trunc

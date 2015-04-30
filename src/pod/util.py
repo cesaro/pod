@@ -24,8 +24,8 @@ def load_net (path, fmt="pnml", prefix="pod: ") :
     except Exception as e :
         raise Exception, "'%s': %s" % (path, e)
     print "%sdone, %d transitions, %d places" % (prefix, len (net.trans), len (net.places))
-    print "%sfirst 5 transitions are:" % prefix
-    for t in net.trans[:5] :
+    print "%sfirst 3 transitions are:" % prefix
+    for t in net.trans[:3] :
         print "%s%s" % (prefix, str (t))
     return net
 

@@ -77,11 +77,27 @@ class Log :
 
     def truncate (self, nr) :
         self.traces = self.traces[:nr]
-        seen = set ()
-        for seq in self.traces :
-            seen.update (set (e.action for e in seq))
+        seen = self.__actions_in_seqs (self.traces)
         for a in (set (self.actionset) - seen) :
             self.actionset.remove (a)
+
+    def discard_duplicates (self) :
+        s = set ()
+        uniq_traces = []
+        for seq in self.traces :
+            seqq = tuple ([e.action for e in seq])
+            if seqq not in s :
+                uniq_traces.append (seq)
+                s.add (seqq)
+        self.traces = uniq_traces
+        seen = self.__actions_in_seqs (uniq_traces)
+        assert (seen == set (self.actionset))
+
+    def __actions_in_seqs (self, seqs) :
+        seen = set ()
+        for seq in seqs :
+            seen.update (set (e.action for e in seq))
+        return seen
 
     def read (self, f, fmt='xes') :
         if isinstance (f, basestring) : f = open (f, 'r')
@@ -152,6 +168,8 @@ class Log :
 
     def __iter__ (self) :
         return iter (self.traces)
+    def __len__ (self) :
+        return len (self.traces)
     def __repr__ (self) :
         nre = sum (len (seq) for seq in self.traces)
         return "id %s, %d traces, %d events, %d actions" % \
