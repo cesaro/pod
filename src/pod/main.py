@@ -111,6 +111,12 @@ The OPTIONS above is zero or more of the following options:
      --smt-forbid-self  : forbids the presence of self loops
 
      Like 'sp-smt-post', it is incompatible with options --smt-{max,nr}-places.
+
+   * ev-only
+     Merges all events with same label into 1 single transition.
+     Merges no condition at all.
+     Ignores negative information.
+     Mainly for debuging purposes
 """
 
 try :
@@ -194,6 +200,7 @@ class Main :
                 "sp-smt",
                 "sp-smt-post",
                 "ip-smt",
+                "ev-only",
                 ]
         p = argparse.ArgumentParser (usage = __doc__, add_help=False)
         #p = argparse.ArgumentParser (usage=__doc__)
@@ -593,8 +600,8 @@ class Main :
             f = open (path, 'r')
             log.read (f, 'xes')
             f.close ()
-        except Exception as (e, m) :
-            raise Exception, "'%s': %s" % (path, m)
+        except Exception as e:
+            raise Exception, "'%s': %s" % (path, e)
         nre = sum (len (seq) for seq in log.traces)
         print '%sdone, %s' % (prefix, repr (log))
         return log
@@ -685,6 +692,8 @@ class Main :
                     self.arg_smt_max_places,
                     self.arg_smt_forbid_self,
                     self.arg_smt_pre_distinct)
+        elif self.arg_eq == "ev-only" :
+            self.meq = Merging_equivalence_factory.ev_only (self.bp)
         else :
             raise AssertionError, "Internal inconsistency"
 
@@ -697,7 +706,7 @@ class Main :
         self.net = net
 
         # verify transformations
-        if self.arg_no_asserts :
+        if self.arg_no_asserts or self.arg_eq == "ev-only":
             print 'pod: bp > net: asserting correctness: skipping !!'
         else :
             bp_to_net_assert_sp (self.bp, self.meq, e2t, c2p)

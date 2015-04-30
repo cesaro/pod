@@ -22,10 +22,11 @@ def log_to_pes (log, indep) :
     return es
 
 def __seq_to_pes (es, i, seq, indep) :
-    if i < 10 :
+    skip_from = 10
+    if i < skip_from :
         print 'pod: log > pes: seq %d len %d %s' % \
                 (i, len (seq), long_list (seq, 10))
-    elif i == 10 :
+    elif i == skip_from :
         print 'pod: log > pes: ... skipping debug info for remaining log sequences'
     c = es.get_empty_config ()
     j = 0
@@ -44,7 +45,7 @@ def __seq_to_pes (es, i, seq, indep) :
             e = es.add_event (a, max_events)
             es.set_cfls (e, indep)
             c.update_enabled_hint (e)
-            if i < 10: print "pod: log > pes:  %s i %d" % (e, j)
+            if i < skip_from: print "pod: log > pes:  %s i %d" % (e, j)
         c.add (e)
         if len (e.pre) == 0 :
             es.update_minimal_hint (e)

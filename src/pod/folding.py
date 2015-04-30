@@ -313,6 +313,29 @@ class Merging_equivalence_factory :
                 i += 1
             meq.tag_class (c, tag)
 
+        meq.assert_is_equivalence ()
         return meq
+
+    @staticmethod
+    def ev_only (unf) :
+
+        # ev-only
+        # Merges all events and no transition
+
+        domain = set (unf.events) | set (unf.conds)
+        meq = ComputedMergingEquivalence (domain)
+        i = 0
+        for a in unf.net.trans :
+            # merge all events with same label
+            for e in a.inverse_label :
+                meq.tag_class (e, i)
+            i += 1
+        for c in unf.conds :
+            meq.tag_class (c, i)
+            i += 1
+
+        meq.assert_is_equivalence ()
+        return meq
+
 
 # vi:ts=4:sw=4:et:

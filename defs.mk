@@ -107,6 +107,10 @@ YACC:=bison
 	@echo "P2D $<"
 	@src/pnml2dot.py < $< > $@
 
+%.pnml : %.cuf
+	@echo "C2P $<"
+	@src/cuf2pnml.py < $< > $@
+
 %.ll_net : %.cuf
 	@echo "C2P $<"
 	@tools/cuf2pep.py < $< > $@
@@ -134,33 +138,9 @@ YACC:=bison
 %.unf.cuf.tr : %.ll_net
 	tools/trt.py timeout=5000 t=cunf net=$< > $@
 
-%.unf.mci : %.ll_net
-	@echo "MLE $<"
-	@mole $< -m $@
-
-%.unf.mci.tr : %.ll_net
-	tools/trt.py timeout=900 t=mole net=$< > $@
-
-%.dl.smod.tr : %.unf.mci.tr
-	tools/trt.py timeout=1200 t=dl.smod mci=$(<:%.tr=%) > $@
-
-%.dl.cnmc.tr : %.unf.cuf.tr
-	tools/trt.py timeout=900 reps=10 t=dl.cnmc cnf cuf=$(<:%.tr=%) > $@
-
-%.dl.cndc.tr : %.unf.cuf.tr
-	tools/trt.py timeout=900 reps=10 t=dl.cndc cuf=$(<:%.tr=%) > $@
-
-%.dl.clp.tr : %.unf.mci.tr
-	tools/trt.py timeout=900 reps=10 t=dl.clp mci=$(<:%.tr=%) > $@
-
-%.dl.lola.tr : %.ll_net
-	tools/trt.py timeout=600 t=dl.lola net=$< > $@
-
-%.dl.smv.tr : %.ll_net
-	tools/trt.py timeout=120 t=dl.smv net=$< > $@
-
-%.dl.mcm.tr : %.unf.mci.tr
-	tools/trt.py timeout=600 t=dl.mcm mci=$(<:%.tr=%) > $@
+#%.unf.mci : %.ll_net
+#	@echo "MLE $<"
+#	@mole $< -m $@
 
 %.ll_net : %.xml
 	@echo "X2P $<"
@@ -168,7 +148,7 @@ YACC:=bison
 
 %.ll_net : %.pnml
 	@echo "P2P $<"
-	@tools/pnml2pep.py < $< > $@
+	@src/pnml2pep.py < $< > $@
 
 %.ll_net : %.grml
 	@echo "G2P $<"
@@ -185,20 +165,4 @@ YACC:=bison
 %.dot : %.mci
 	@echo "M2D $<"
 	@mci2dot $< > $@
-
-%.punf.r.c.txt : %.ll_net
-	-punf -r -c -n=200000 -N=1 -s -t -@4 '-#' $< > $@ 2>&1
-	echo >> $@
-	echo "mci2mp:" >> $@
-	mci2mp $(basename $<).mci >> $@
-	echo >> $@
-	echo "prcompress:" >> $@
-	./prcompress -v $(basename $<).mci >> $@
-	./tools/cmerge.py < $(basename $<).pr.cuf > /dev/null 2>> $@
-
-%.punf.c.txt : %.ll_net
-	-punf -c -n=200000 -N=1 -s -t -@4 '-#' $< > $@ 2>&1
-	echo >> $@
-	echo "mci2mp:" >> $@
-	mci2mp $(basename $<).mci >> $@
 
