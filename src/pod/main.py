@@ -28,6 +28,7 @@ The OPTIONS above is zero or more of the following options:
 
  --log-fraction-truncate=N
    If the log has x sequences, it uses only the first x*(N/100) sequences of it.
+   Option incompatible with --log-truncate
 
  --log-only=N1,N2,...
    Uses only sequences N1, N2, ... of the log to perform the synthesis. The
@@ -279,9 +280,11 @@ class Main :
                     "arg_no_asserts",
                     "arg_log_path",
                     "arg_log_trunc",
+                    "arg_log_trunc_frac",
                     "arg_log_only",
                     "arg_log_exclude",
                     "arg_log_negative",
+                    "arg_log_unique",
                     "arg_smt_timeout",
                     "arg_smt_pre_distinct",
                     #"arg_smt_merge_post",
