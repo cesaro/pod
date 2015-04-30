@@ -1,5 +1,6 @@
 """
 
+pod [OPTIONS] net-stats          PNMLFILE
 pod [OPTIONS] extract-dependence PNMLFILE
 pod [OPTIONS] dump-log           LOGFILE
 pod [OPTIONS] dump-pes           LOGFILE DEPENFILE
@@ -164,6 +165,7 @@ class Main :
 
         cmd_choices = [
                 "extract-dependence",
+                "net-stats",
                 "dump-log",
                 "dump-pes",
                 "dump-bp",
@@ -230,7 +232,7 @@ class Main :
             self.arg_smt_min_places = args.smt_min_places
             self.arg_smt_max_places = args.smt_max_places
 
-        if self.arg_command not in ["extract-dependence", "dump-log"] :
+        if self.arg_command not in ["extract-dependence", "dump-log", "net-stats"] :
             if self.arg_depen_path == None :
                 raise Exception, "Expected path to a dependence file"
 
@@ -285,6 +287,8 @@ class Main :
             self.cmd_dump_log ()
         elif self.arg_command == "dump-pes" :
             self.cmd_dump_pes ()
+        elif self.arg_command == "net-stats" :
+            self.cmd_net_stats ()
         elif self.arg_command == "merge" :
             self.cmd_merge ()
         else :
@@ -338,6 +342,72 @@ class Main :
         for seq in self.log_both :
             print "%4d %3d %s" % (i, len (seq), seq)
             i += 1
+
+    def cmd_net_stats (self) :
+        # load the net
+        net = load_net (self.arg_log_path, "pnml", "pod: stats: ")
+
+        d = {}
+        d["net.transitions"] = len (net.trans)
+        d["net.places"] = len (net.places)
+
+        # min, max, avg preset/postsets size for transitions
+        pre_mi, pre_ma, pre_av = 9999999999, 0, 0
+        post_mi, post_ma, post_av = 9999999999, 0, 0
+        for t in net.trans :
+            if len (t.pre) < pre_mi : pre_mi = len (t.pre)
+            if len (t.pre) > pre_ma : pre_ma = len (t.pre)
+            pre_av += len (t.pre)
+            if len (t.post) < post_mi : post_mi = len (t.post)
+            if len (t.post) > post_ma : post_ma = len (t.post)
+            post_av += len (t.post)
+
+        spre  = "%d, %d, %.2f" % (pre_mi, pre_ma, pre_av / float (len (net.trans)))
+        spost = "%d, %d, %.2f" % (post_mi, post_ma, post_av / float (len (net.trans)))
+
+        d["trans.pre  size min/max/avg"] = spre
+        d["trans.post size min/max/avg"] = spost
+
+        # min, max, avg preset/postsets size for places
+        pre_mi, pre_ma, pre_av = 9999999999, 0, 0
+        post_mi, post_ma, post_av = 9999999999, 0, 0
+        for p in net.places :
+            if len (p.pre) < pre_mi : pre_mi = len (p.pre)
+            if len (p.pre) > pre_ma : pre_ma = len (p.pre)
+            pre_av += len (p.pre)
+            if len (p.post) < post_mi : post_mi = len (p.post)
+            if len (p.post) > post_ma : post_ma = len (p.post)
+            post_av += len (p.post)
+
+        spre  = "%d, %d, %.2f" % (pre_mi, pre_ma, pre_av / float (len (net.places)))
+        spost = "%d, %d, %.2f" % (post_mi, post_ma, post_av / float (len (net.places)))
+
+        d["place.pre  size min/max/avg"] = spre
+        d["place.post size min/max/avg"] = spost
+
+        s = ""
+        for t in net.trans :
+            for p,w in t.weight_pre.items () :
+                if w != 1 :
+                    s = "no, '%s' -> '%s' has weight %d" % (repr (p), repr (t), w)
+            for p,w in t.weight_post.items () :
+                if w != 1 :
+                    s = "no, '%s' -> '%s' has weight %d" % (repr (t), repr (p), w)
+            assert (len (t.cont) == 0)
+        for p in net.places :
+            for t,w in p.weight_pre.items () :
+                if w != 1 :
+                    s = "no, '%s' -> '%s' has weight %d" % (repr (t), repr (p), w)
+            for t,w in p.weight_post.items () :
+                if w != 1 :
+                    s = "no, '%s' -> '%s' has weight %d" % (repr (p), repr (t), w)
+            assert (len (p.cont) == 0)
+        if len (s) == 0 :
+            s = "yes, all arc weights are 1"
+        d["net.is-ordinary"] = s
+
+        print
+        output_dict (sys.stdout, d, "")
 
     def cmd_dump_pes (self) :
         # same as dump log but with the pes

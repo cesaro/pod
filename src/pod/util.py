@@ -8,7 +8,7 @@ def output_dict (f, d, prefix='podisc: ') :
     l = list (d)
     l.sort ()
     for k in l :
-        output (f, k, d[k], n, prefix)
+        output_pair (f, k, d[k], n, prefix)
 
 def output_pair (f, k, v, n, prefix='', fmt='%s') :
     f.write (prefix + ('%-*s : ' + fmt + '\n') % (n, k, v))
