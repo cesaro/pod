@@ -1,5 +1,6 @@
 
 import sys
+import random
 import xml.parsers.expat
 
 class Transition :
@@ -308,6 +309,7 @@ class Net :
         return True
 
     def enabled (self, marking) :
+        # returns an iterator to the transitions enabled at this marking
         #result = set ()
         candidates = set ()
         m = self.new_mark ()
@@ -356,8 +358,7 @@ class Net :
 #            db ('firing', t)
             if not self.enables (m, t) :
                 raise Exception, 'Cannot fire, transition not enabled'
-            m -= set (t.pre)
-            m |= set (t.post)
+            m = self.fire (m, t)
 #        db ('reached', list (m), 'enables', self.enabled (m))
         return m
 
@@ -523,6 +524,21 @@ class Net :
                         y.m = m
                         work2.append (y)
             work = work2
+
+    def generate_random_run (self, length, marking=None) :
+        # returns a random sequence of net transitions of requested length,
+        # unless a deadlock state is reached ;)
+
+        m = marking if marking != None else self.m0.clone ()
+        run = []
+        for i in range (length) :
+            ena = list (self.enabled (m))
+            if len (ena) == 0 : break
+            t = random.choice (ena)
+            run.append (t)
+            m = self.fire (m, t)
+        self.fire_run (run) # asserts this as a run
+        return run
 
     def write (self, f, fmt='pep', m=0) :
         if isinstance (f, basestring) : f = open (f, 'w')

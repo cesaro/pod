@@ -56,7 +56,7 @@ class ActionSet :
         return len (self.tab)
 
 class Event :
-    def __init__ (self, action, attr) :
+    def __init__ (self, action, attr=None) :
         self.action = action
         self.attr = attr
 
@@ -121,6 +121,40 @@ class Log :
                 seq.append (e)
             self.traces.append (seq)
 
+    def write (self, f, fmt='xes') :
+        closeit = False
+        if isinstance (f, basestring) :
+            f = open (f, 'w')
+            closeit = True
+        if fmt == 'xes' : return self.__write_xes (f)
+        if closeit : f.close ()
+        raise ValueError, "'%s': unknown output format" % fmt
+
+    def __write_xes (self, f) :
+
+        f.write ('<log openxes.version="1.0RC7" xes.features="" xes.version="1.0" xmlns="http://www.xes-standard.org/">\n')
+        f.write ('<extension name="Concept" prefix="concept" uri="http://www.xes-standard.org/concept.xesext" />\n')
+        f.write ('<string key="concept:name" value="Aha!" />\n')
+        i = 0
+        for seq in self.traces :
+            f.write ('<trace>\n')
+            f.write ('\t<string key="concept:name" value="seq%d" />\n' % i)
+            i += 1
+            for e in seq :
+                f.write ('\t<event>\n')
+                f.write ('\t<string key="concept:name" value="%s" />\n' % e.action.name)
+                f.write ('\t</event>\n')
+            f.write ('</trace>\n')
+        f.write ('</log>\n')
+
+    def add_seq_from_names (self, seq) :
+        evseq = []
+        for name in seq :
+            a = self.actionset.lookup_or_create (name)
+            e = Event (a)
+            evseq.append (e)
+        self.traces.append (evseq)
+
     def clone (self) :
         # we duplicate the actions set (but not the actions, just the set
         # containing them), and we also duplicate the list self.traces (but
@@ -172,8 +206,9 @@ class Log :
         return len (self.traces)
     def __repr__ (self) :
         nre = sum (len (seq) for seq in self.traces)
-        return "id %s, %d traces, %d events, %d actions" % \
-            (id (self), len (self.traces), nre, len (self.actionset))
+        avg = float (nre) / len (self.traces)
+        return "%d seq, %d log events, %.1f evs/seq, %d distinct actions" % \
+            (len (self.traces), nre, avg, len (self.actionset))
     def __str__ (self) :
         return "traces %s actions %s" % (self.traces, list (self.actionset))
 

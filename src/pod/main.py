@@ -2,6 +2,7 @@
 
 pod [OPTIONS] net-stats          PNMLFILE
 pod [OPTIONS] extract-dependence PNMLFILE
+pod [OPTIONS] extract-log        PNMLFILE
 pod [OPTIONS] dump-log           LOGFILE
 pod [OPTIONS] dump-pes           LOGFILE DEPENFILE
 pod [OPTIONS] dump-bp            LOGFILE DEPENFILE
@@ -11,6 +12,8 @@ pod [OPTIONS] merge              LOGFILE DEPENFILE
 
 NOTE: Only the commands:
  - extract-dependence
+ - extract-log
+ - net-stats
  - dump-log
  - dump-pes
  - merge
@@ -24,7 +27,7 @@ The OPTIONS above is zero or more of the following options:
  --log-truncate=N
    Uses only the first N sequences of the log to perform the synthesis. This
    can be very useful for understanding the transformation performed by the
-   tool.
+   tool.  When in 'extract-log' mode, N is the number of sequences to generate.
 
  --log-fraction-truncate=N
    If the log has x sequences, it uses only the first x*(N/100) sequences of it.
@@ -118,6 +121,7 @@ try :
     import resource
     import networkx
     import argparse
+    import random
 
     import z3
     import ptnet
@@ -173,6 +177,7 @@ class Main :
 
         cmd_choices = [
                 "extract-dependence",
+                "extract-log",
                 "net-stats",
                 "dump-log",
                 "dump-pes",
@@ -249,7 +254,8 @@ class Main :
         if self.arg_log_trunc_frac != None and self.arg_log_trunc != None :
                 raise Exception, "At most one of --log-truncate and --log-fraction-truncate"
 
-        if self.arg_command not in ["extract-dependence", "dump-log", "net-stats"] :
+        if self.arg_command not in \
+            ["extract-dependence", "dump-log", "net-stats", "extract-log"] :
             if self.arg_depen_path == None :
                 raise Exception, "Expected path to a dependence file"
 
@@ -269,6 +275,7 @@ class Main :
         else :
             d = {
                 "extract-dependence" : "dependence.txt",
+                "extract-log"        : "log.xes",
                 "dump-pes"           : "pes.dot",
                 "dump-bp"            : "bp.pdf",
                 "dump-encoding"      : "encoding.smt2",
@@ -302,6 +309,8 @@ class Main :
 
         if self.arg_command == "extract-dependence" :
             self.cmd_extract_dependence ()
+        elif self.arg_command == "extract-log" :
+            self.cmd_extract_log ()
         elif self.arg_command == "dump-log" :
             self.cmd_dump_log ()
         elif self.arg_command == "dump-pes" :
@@ -316,25 +325,25 @@ class Main :
     def cmd_extract_dependence (self) :
 
         # load the net
-        net = load_net (self.arg_log_path, "pnml", "pod: extract: ")
+        net = load_net (self.arg_log_path, "pnml", "pod: extract-dep: ")
 
         # create a dependence relation and fill it from the net
         dep = Depen ()
-        print "pod: extract: extracting dependence relation ..."
+        print "pod: extract-dep: extracting dependence relation ..."
         dep.from_net_names (net)
 
         # XXX - hack: ensure that the relation is "positively" stored
         assert (dep.negate == False)
-        print "pod: extract: done, %d different actions, %d pairs" \
+        print "pod: extract-dep: done, %d different actions, %d pairs" \
                 % (len (dep.domain), len (dep.pairs))
 
         # warnings
         s = set ()
         for t in net.trans :
             if " " in t.name :
-                print "pod: extract: WARNING: transition '%s' contains spaces in the name" % t.name
+                print "pod: extract-dep: WARNING: transition '%s' contains spaces in the name" % t.name
             if t.name in s :
-                print "pod: extract: WARNING: 2 transition with same name: '%s'" % t.name
+                print "pod: extract-dep: WARNING: 2 transition with same name: '%s'" % t.name
             s.add (t.name)
 
         # save
@@ -347,7 +356,50 @@ class Main :
             f.close ()
         except Exception as (e, m) :
             raise Exception, "'%s': %s" % (self.arg_output_path, m)
-        print "pod: extract: output saved to '%s'" % self.arg_output_path
+        print "pod: extract-dep: output saved to '%s'" % self.arg_output_path
+
+    def cmd_extract_log (self) :
+        # load the net
+        net = load_net (self.arg_log_path, "pnml", "pod: extract-log: ")
+        acset = ActionSet
+        log = Log ()
+
+        nr_seqs = self.arg_log_trunc
+        if nr_seqs == None : nr_seqs = 100
+        min_len = 2
+        max_len = 30
+
+        print "pod: extract-log: generating %d random runs, min/max len = %d/%d" \
+                % (nr_seqs, min_len, max_len)
+        while True :
+            for i in xrange (20) :
+                le = random.randrange (min_len, max_len + 1)
+                run = net.generate_random_run (le)
+                run = [t.name for t in run]
+                log.add_seq_from_names (run)
+            log.discard_duplicates ()
+            print 'pod: extract-log: %s' % repr (log)
+            if len (log) >= nr_seqs :
+                log.truncate (nr_seqs)
+                break
+        print 'pod: extract-log: done, removing duplicates'
+        print 'pod: extract-log: result:', repr (log)
+        print 'pod: extract-log: first 10 sequences:'
+
+        i = 0
+        print " Idx Len Sequence"
+        print "---- --- ----------------------------------------"
+        for seq in log :
+            print "%4d %3d %s" % (i, len (seq), long_list (seq, 8))
+            i += 1
+            if i >= 10 : break
+
+        # save
+        try :
+            log.write (self.arg_output_path, 'xes')
+        except Exception as (e, m) :
+            raise Exception, "'%s': %s" % (self.arg_output_path, m)
+        print "pod: extract-log: output saved to '%s'" % self.arg_output_path
 
     def cmd_dump_log (self) :
         # load the positive and negative logs
@@ -499,8 +551,7 @@ class Main :
             print "pod: logs: positive: discarding duplicated sequences"
             self.log.discard_duplicates ()
             nre = sum (len (seq) for seq in self.log.traces)
-            print 'pod: logs: positive: new log: %d seq, %d log events, %d distinct actions' \
-                    % (len (self.log.traces), nre, len (self.acset))
+            print 'pod: logs: positive: new log: %s' % repr (self.log)
 
         # translate --log-trunc-frac to --log-trunc
         assert (len (self.log) == len (self.log.traces))
@@ -517,8 +568,7 @@ class Main :
                 % self.arg_log_trunc
             self.log.truncate (self.arg_log_trunc)
             nre = sum (len (seq) for seq in self.log.traces)
-            print 'pod: logs: positive: new log: %d seq, %d log events, %d distinct actions' \
-                    % (len (self.log.traces), nre, len (self.acset))
+            print 'pod: logs: positive: new log:', repr (self.log)
         if self.arg_log_only != None or self.arg_log_exclude != None:
             raise NotImplementedError
 
@@ -546,8 +596,7 @@ class Main :
         except Exception as (e, m) :
             raise Exception, "'%s': %s" % (path, m)
         nre = sum (len (seq) for seq in log.traces)
-        print '%sdone, %d seq, %d log events, %d distinct actions' \
-                % (prefix, len (log.traces), nre, len (self.acset))
+        print '%sdone, %s' % (prefix, repr (log))
         return log
 
     def __load_indep (self) :
