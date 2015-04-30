@@ -255,24 +255,24 @@ class Merging_equivalence_factory :
 
     @staticmethod
     def sp_smt (unf, timeout=30000, \
-            nr_places=None, forbid_self=False, pre_distinct=False, merge_post=False) :
+            min_places=None, max_places=None, forbid_self=False, pre_distinct=False, merge_post=False) :
 
         # sp-smt
 
         print 'pod: bp > net: building SMT encoding...'
-        encoding = SMT_encoding_sp (unf)
-        encoding.encode (nr_places, forbid_self, pre_distinct, merge_post)
+        encoding = SMT_encoding_sp_canonical (unf)
+        encoding.encode (min_places, max_places, forbid_self, pre_distinct, merge_post)
         return Merging_equivalence_factory.__smt_solve_merge_all_evs (unf, encoding, timeout)
 
     @staticmethod
     def ip_smt (unf, indep, timeout=30000, \
-            nr_places=None, forbid_self=False, pre_distinct=False) :
+            min_places=None, max_places=None, forbid_self=False, pre_distinct=False) :
 
         # ip-smt
 
         print 'pod: bp > net: building SMT encoding...'
-        encoding = SMT_encoding_ip_3 (unf)
-        encoding.encode (indep, nr_places, forbid_self, pre_distinct)
+        encoding = SMT_encoding_ip_canonical (unf)
+        encoding.encode (indep, min_places, max_places, forbid_self, pre_distinct)
         return Merging_equivalence_factory.__smt_solve_merge_all_evs (unf, encoding, timeout)
 
     @staticmethod

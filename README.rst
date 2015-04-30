@@ -146,4 +146,10 @@ sp-pre
 TODO
 ----
 
-- improving extract-dependence (post \cap post is unnecessary)
+x improving extract-dependence (post \cap post is unnecessary)
+- accounting for exact nr. of places when merging postsets
+- using 'events-only', devise a (huge!) reduction of SMT encodings
+- in the IP encoding, search for cliques of independent transitions and use
+  (distinct x y z) for, e.g., the presets of them
+
+- mode to extract logs

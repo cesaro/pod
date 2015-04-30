@@ -393,7 +393,7 @@ class SMT_base_encoding (Base_encoding) :
         # encode that all presets (postsets) in events give rise to the same set
         # of equivalence classes
 
-        print 'pod: circular: pre %s post %s events %s' % (pre, post, long_list (events, 10))
+        print 'pod: smt: circular: %s %s %s' % (pre, post, long_list (events, 10))
 
         # nothing to do if there is less than 2 events
         if len (events) < 2 : return
@@ -416,19 +416,25 @@ class SMT_base_encoding (Base_encoding) :
             self.encode_subset (e.post, events[0].post, True)
 
     def encode_non_disjoint (self, setx, sety) :
-        print 'pod: smt: non-disjoint %s %s' % (setx, sety)
+        self.z3.add (self.encode_non_disjoint_get_constraint (setx, sety))
+
+    def encode_non_disjoint_get_constraint (self, setx, sety) :
+        #print 'pod: smt: non-disjoint %s %s' % (list (setx), list (sety))
         l = []
         for x in setx :
             v = self.varmap (x)
             l.extend ([self.varmap (y) == v for y in sety])
         cons = z3.Or (l)
-        self.z3.add (cons)
+        #print 'pod: smt: ip: non-disjoint:', cons
+        return cons
 
     def encode_disjoint (self, setx, sety) :
-        print 'pod: smt: disjoint %s %s' % (setx, sety)
+        #print 'pod: smt: disjoint %s %s' % (list (setx), list (sety))
         for x in setx :
+            v = self.varmap (x)
             for y in sety :
-                self.z3.add (self.varmap (x) != self.varmap (y))
+                self.z3.add (v != self.varmap (y))
+                #print 'pod: smt: ip: disjoint:', (v != self.varmap (y))
 
     def unf_stats (self) :
         for a in self.unf.net.trans :
@@ -438,85 +444,34 @@ class SMT_base_encoding (Base_encoding) :
             pre_ma = max (pres)
             post_mi = min (posts)
             post_ma = max (posts)
-            print "pod: ac '%s' count %d events  %s" % \
+            print "pod: smt: ac '%s' count %d events  %s" % \
                     (a, len (a.inverse_label), long_list (a.inverse_label, 15))
             #print "pod:    '%s' pres %s" % (a, long_list (pres, -25))
-            print "pod:    '%s' pre : min,max = %d,%d" % (a, pre_mi, pre_ma)
-            print "pod:    '%s' post: min,max = %d,%d" % (a, post_mi, post_ma)
+            print "pod: smt:    '%s' pre : min,max = %d,%d" % (a, pre_mi, pre_ma)
+            print "pod: smt:    '%s' post: min,max = %d,%d" % (a, post_mi, post_ma)
 
-class SMT_encoding_sp (SMT_base_encoding) :
+class SMT_encoding_sp_canonical (SMT_base_encoding) :
     def __init__ (self, unfolding) :
         SMT_base_encoding.__init__ (self, unfolding)
 
     def encode (self, \
-            nr_places=None, forbid_self=False, pre_distinct=False, merge_post=False) :
+            min_places=None, max_places=None, forbid_self=False,
+            pre_distinct=False, merge_post=False) :
 
-        print 'pod: bp > net: smt: params: nr_places        :', nr_places
-        print 'pod: bp > net: smt: params: pre_distinct     :', pre_distinct
-        print 'pod: bp > net: smt: params: merge_post       :', merge_post
-        print 'pod: bp > net: smt: params: forbid_self_loops:', forbid_self
-        self.unf_stats ()
+        print 'pod: bp > net: smt: sp: params: min_places       :', min_places
+        print 'pod: bp > net: smt: sp: params: max_places       :', max_places
+        print 'pod: bp > net: smt: sp: params: pre_distinct     :', pre_distinct
+        print 'pod: bp > net: smt: sp: params: merge_post       :', merge_post
+        print 'pod: bp > net: smt: sp: params: forbid_self_loops:', forbid_self
 
+        #self.unf_stats ()
         self.z3 = z3.Solver ()
-        self.__canonical_guy_fixed (nr_places, pre_distinct, merge_post)
+        cano_pre, cano_post = self.find_canonical_representatives ()
+        self.encode_sp_canonical (cano_pre, cano_post, \
+                min_places, max_places, pre_distinct, merge_post)
         if forbid_self :
             self.forbid_self_loops ()
         #print 'encoding', self.z3
-
-    def __test (self) :
-        self.__stats ()
-        canonical = {}
-        for a in self.unf.net.trans :
-            if len (a.inverse_label) == 0 :
-                continue
-            if len (a.inverse_label) == 1 :
-                e = next (iter (a.inverse_label))
-                canonical[a] = e
-                if len (e.pre) < 2 : continue
-                cons = z3.Distinct ([self.varmap (c) for c in e.pre])
-                #print 'pod: alone: e %s cons %s' % (e, cons)
-                #self.z3.add (cons)
-                continue
-
-            # find canonical
-            evs = list (a.inverse_label)
-            m = min (range (len (evs)), key = lambda i : len (evs[i].pre))
-            e = evs[m]
-            canonical[a] = e
-
-            # require all conditions in preset are distinct
-            if len (e.pre) >= 2 :
-                cons = z3.Distinct ([self.varmap (c) for c in e.pre])
-                #print 'pod: min:', cons
-                #self.z3.add (cons)
-
-            # subsets
-            for i in range (0, len (evs) - 1) :
-                e = evs[i]
-                ep = evs[i + 1]
-                self.encode_subset (e.pre, ep.pre, True)
-
-            # and more subsets
-            e = evs[len (evs) - 1]
-            self.encode_subset (e.pre, evs[0].pre, True)
-
-
-        # print canonicals
-        for a,e in canonical.items () : print 'pod: canonical a "%s" e %s' % (a, e)
-        s = set ()
-        for e in canonical.values () : s |= e.pre
-
-        # all canonicals' presets are in 0--5 (hernan)
-        nr_places = 19
-        for c in s :
-            self.z3.add (self.varmap (c) >= 0)
-            self.z3.add (self.varmap (c) < nr_places)
-
-        # for each i there is at least one canonical condition
-        for i in range (nr_places) :
-            cons = z3.Or ([i == self.varmap (c) for c in s])
-            #print 'xxx', cons
-            self.z3.add (cons)
 
     def __canonical_guy_fixed (self, nr_places=None, pre_distinct=False, merge_post=False) :
         # do the fixed encoding of the ``canonical guy'', requiesting that the
@@ -555,7 +510,7 @@ class SMT_encoding_sp (SMT_base_encoding) :
             self.circular_subset_constraint (evs, True, merge_post)
 
         # print canonicals
-        for e in canonical.values () : print "pod: canonical:", e
+        for e in canonical.values () : print "pod: smt: canonical:", e
 
         # we rely on this if there we've been requested an exact number of
         # places (if all conditions are in a preset, then they will be
@@ -574,14 +529,157 @@ class SMT_encoding_sp (SMT_base_encoding) :
             self.z3.add (v >= 0)
             if nr_places != None :
                 self.z3.add (v < nr_places)
-                #print 'pod: upper bound:', v < nr_places
+                #print 'pod: smt: upper bound:', v < nr_places
 
         # for each i there is at least one canonical condition
         if nr_places != None :
             for i in range (nr_places) :
                 cons = z3.Or ([i == self.varmap (c) for c in canonical_conds])
                 self.z3.add (cons)
-                #print 'pod: lower bound:', cons
+                #print 'pod: smt: lower bound:', cons
+
+    def find_canonical_representatives (self) :
+        cano_pre = {}
+        cano_post = {}
+        for a in self.unf.net.trans :
+            evs = list (a.inverse_label)
+            if (len (evs) == 0) :
+                cano_pre[a] = set ()
+                cano_post[a] = set ()
+                continue
+
+            # find an event with minimal preset size
+            m = min (range (len (evs)), key = lambda i : len (evs[i].pre))
+            cano_pre[a] = evs[m].pre
+            #print 'pod: smt: canonical: action "%s" pre  %s' % (a, evs[m])
+
+            # now one with minimal postset size
+            m = min (range (len (evs)), key = lambda i : len (evs[i].post))
+            cano_post[a] = evs[m].post
+            #print 'pod: smt: canonical:        "%s" post %s' % (a, evs[m])
+
+        return cano_pre, cano_post
+
+    def encode_sp_canonical (self, cano_pre, cano_post, \
+            min_places=None, max_places=None, pre_distinct=False, merge_post=False) :
+        # do the fixed encoding of the ``canonical guy'', requiesting that the
+        # number of places is "nr_places", asking that presets of canonical guys
+        # do not merge iff "distinct" is True, and generating constraints to
+        # merge also the postset if "want_post" is True
+
+        assert (len (cano_pre) == len (cano_post) == len (self.unf.net.trans))
+        for a in self.unf.net.trans :
+            # encode that all presets in the inverse_label give rise to the same
+            # set of equivalence classes (possibly also for postsets)
+            evs = list (a.inverse_label)
+            self.circular_subset_constraint (evs, True, merge_post)
+
+            # the variables of conditions in the preset of the canonincal's
+            # preset are all different (if requested)
+            if pre_distinct:
+                self.all_distinct (cano_pre[a])
+
+        # FIXME
+        # the next will force the number of equivalence classes to be equal to
+        # nr_places, but only works if we have a canonical representative
+        # condition of every class, which we only have for conditions in
+        # presets; the only ones missing are maximal conditions of the
+        # unfolding, it's possible to compute those classes, but I don't have
+        # time :( The result is that nr_places becomes a lower bound instead of
+        # the final number of classes
+
+        # get the list of canonical conditions ("the places")
+        canonical_conds = set ()
+        for pre in cano_pre.values () : canonical_conds.update (pre)
+
+        # XXX - partial fix: minimum and maximum number of conditions :)
+        if merge_post and max_places != None :
+            raise ValueError, "SP encoding: current encoding cannot merge postsets and set an upper bound on the number of places"
+
+        # we rely on this if there we've been requested an exact number of
+        # places (if all conditions are in a preset, then they will be
+        # equivalent to some canonical preset)
+        if max_places != None :
+            for c in self.unf.conds :
+                assert (len (c.post) >= 1)
+
+        # all of them are >= 0; we conditionally require them to be <= nr_places
+        for c in canonical_conds :
+            v = self.varmap (c)
+            self.z3.add (v >= 0)
+            if max_places != None :
+                self.z3.add (v < max_places)
+                #print 'pod: smt: upper bound:', v < max_places
+
+        # for each i there is at least one canonical condition
+        if min_places != None :
+            for i in range (min_places) :
+                cons = z3.Or ([i == self.varmap (c) for c in canonical_conds])
+                self.z3.add (cons)
+                #print 'pod: smt: lower bound:', cons
+
+class SMT_encoding_ip_canonical (SMT_encoding_sp_canonical) :
+    def __init__ (self, unfolding) :
+        SMT_encoding_sp_canonical.__init__ (self, unfolding)
+
+    def encode (self, indep, \
+            min_places=None, max_places=None, forbid_self=False, pre_distinct=False) :
+
+        # merge all events with same label
+        # merge the presets and postsets of two merged events
+        # require preservation of independence
+
+        print 'pod: bp > net: smt: ip: params: min_places       :', min_places
+        print 'pod: bp > net: smt: ip: params: max_places       :', max_places
+        print 'pod: bp > net: smt: ip: params: pre_distinct     :', pre_distinct
+        print 'pod: bp > net: smt: ip: params: forbid_self_loops:', forbid_self
+
+        #self.unf_stats ()
+        self.z3 = z3.Solver ()
+        cano_pre, cano_post = self.find_canonical_representatives ()
+        self.encode_sp_canonical (cano_pre, cano_post, \
+                min_places, max_places, pre_distinct, True)
+        self.encode_ip_canonical (cano_pre, cano_post, indep)
+        if forbid_self :
+            self.forbid_self_loops ()
+
+    def __encode_dependent_intersections (self, pre1, pre2, post1, post2) :
+
+        # (pre1 \cap pre2)  is non-empty, OR
+        # (pre1 \cap post2) is non-empty, OR
+        # (post1 \cap pre2) is non-empty
+        #print 'pod: smt: dependent_inter: pre1=%s post1=%s' % (list (pre1), list (post1))
+        #print 'pod: smt:                  pre2=%s post2=%s' % (list (pre2), list (post2))
+
+        fst_or = self.encode_non_disjoint_get_constraint (pre1, pre2)
+        snd_or = self.encode_non_disjoint_get_constraint (pre1, post2)
+        thrd_or = self.encode_non_disjoint_get_constraint (post1, pre2)
+        cons = z3.Or ([fst_or, snd_or, thrd_or])
+        self.z3.add (cons)
+        #print 'pod: smt: ip: dependent:', cons
+
+    def encode_ip_canonical (self, cano_pre, cano_post, indep) :
+        nr1 = 0
+        nr2 = 0
+        for i in range (len (self.unf.net.trans)) :
+            for j in range (i + 1, len (self.unf.net.trans)) :
+                ai = self.unf.net.trans[i]
+                aj = self.unf.net.trans[j]
+
+                if indep.get (ai, aj) :
+                    # independent
+                    #print "pod: smt: ip: independent '%s' '%s'" % (ai, aj)
+                    self.encode_disjoint (cano_pre[ai], cano_pre[aj] | cano_post[aj])
+                    self.encode_disjoint (cano_post[ai], cano_pre[aj])
+                    nr1 += 1
+                else :
+                    # dependent
+                    #print "pod: smt: ip: dependent '%s' '%s'" % (ai, aj)
+                    self.__encode_dependent_intersections ( \
+                            cano_pre[ai], cano_pre[aj],
+                            cano_post[ai], cano_post[aj])
+                    nr2 += 1
+        print "pod: bp > net: smt: ip: encoded pairs: dep/indep = %d/%d" % (nr2, nr1)
 
 class SMT_base_encoding_ip (SMT_base_encoding) :
     def __init__ (self, unfolding) :
@@ -593,9 +691,9 @@ class SMT_base_encoding_ip (SMT_base_encoding) :
             for j in range (i + 1, len (self.unf.events)) :
                 ei = self.unf.events[i]
                 ej = self.unf.events[j]
-                #print "podisc: smt: pre_post: ei", repr (ei), "ej", repr (ej)
+                #print "pod: smt: pre_post: ei", repr (ei), "ej", repr (ej)
                 if ei.label != ej.label : continue # important optimization
-                #print "podisc: smt: pre_post: after!"
+                #print "pod: smt: pre_post: after!"
 
                 xi = self.varmap (ei)
                 xj = self.varmap (ej)
@@ -614,104 +712,6 @@ class SMT_base_encoding_ip (SMT_base_encoding) :
 
     def encode_removal (self) :
         pass
-
-class SMT_encoding_ip_3 (SMT_base_encoding_ip) :
-    def __init__ (self, unfolding) :
-        SMT_base_encoding_ip.__init__ (self, unfolding)
-
-    def encode (self, indep, \
-            nr_places=None, forbid_self=False, pre_distinct=False) :
-        # merge all events with same label
-        # merge the presets and postsets of two merged events
-        # require preservation of independence
-        cano_pre, cano_post = self.find_canonical_representatives ()
-        self.encode_sp_canonical (cano_pre, cano_post, \
-                nr_places, pre_distinct, True)
-        self.encode_ip_canonical (cano_pre, cano_post, indep)
-        if forbid_self :
-            self.forbid_self_loops ()
-
-    def find_canonical_representatives (self) :
-        cano_pre = {}
-        cano_post = {}
-        for a in self.unf.net.trans :
-            evs = list (a.inverse_label)
-            if (len (evs) == 0) :
-                cano_pre[a] = set ()
-                cano_post[a] = set ()
-                continue
-
-            # find an event with minimal preset size
-            m = min (range (len (evs)), key = lambda i : len (evs[i].pre))
-            cano_pre[a] = evs[m].pre
-            print 'pod: smt: canonical: action "%s" pre  %s' % (a, evs[m])
-
-            # now one with minimal postset size
-            m = min (range (len (evs)), key = lambda i : len (evs[i].post))
-            cano_post[a] = evs[m].post
-            print 'pod: smt: canonical:        "%s" post %s' % (a, evs[m])
-
-        return cano_pre, cano_post
-
-    def encode_ip_canonical (self, cano_pre, cano_post, indep) :
-        for i in range (len (self.unf.net.trans)) :
-            for j in range (i + 1, len (self.unf.net.trans)) :
-                ai = self.unf.net.trans[i]
-                aj = self.unf.net.trans[j]
-
-                if indep.get (ai, aj) :
-                    # independent
-                    self.encode_disjoint (cano_pre[ai], cano_pre[aj] | cano_post[aj])
-                    self.encode_disjoint (cano_post[ai], cano_pre[aj])
-                else :
-                    # dependent
-                    self.encode_non_disjoint (cano_pre[ai], cano_pre[aj] | cano_post[aj])
-                    self.encode_non_disjoint (cano_post[ai], cano_pre[aj])
-
-    def encode_sp_canonical (self, cano_pre, cano_post, \
-            nr_places=None, pre_distinct=False, merge_post=False) :
-        # do the fixed encoding of the ``canonical guy'', requiesting that the
-        # number of places is "nr_places", asking that presets of canonical guys
-        # do not merge iff "distinct" is True, and generating constraints to
-        # merge also the postset if "want_post" is True
-
-        assert (len (cano_pre) == len (cano_post) == len (self.unf.net.trans))
-        for a in self.unf.net.trans :
-            # encode that all presets in the inverse_label give rise to the same
-            # set of equivalence classes (possibly also for postsets)
-            evs = list (a.inverse_label)
-            self.circular_subset_constraint (evs, True, merge_post)
-
-            # the variables of conditions in the preset of the canonincal's
-            # preset are all different (if requested)
-            if pre_distinct:
-                self.all_distinct (cano_pre[a])
-
-        # we rely on this if there we've been requested an exact number of
-        # places (if all conditions are in a preset, then they will be
-        # equivalent to some canonical preset)
-        if nr_places != None :
-            for c in self.unf.conds :
-                assert (len (c.post) >= 1)
-
-        # get the list of canonical conditions ("the places")
-        canonical_conds = set (cano_pre.values ())
-
-        # all of them are >= 0; we conditionally require them to be <= nr_places
-        for c in canonical_conds :
-            v = self.varmap (c)
-            self.z3.add (v >= 0)
-            if nr_places != None :
-                self.z3.add (v < nr_places)
-                #print 'pod: upper bound:', v < nr_places
-
-        # for each i there is at least one canonical condition
-        if nr_places != None :
-            for i in range (nr_places) :
-                cons = z3.Or ([i == self.varmap (c) for c in canonical_conds])
-                self.z3.add (cons)
-                #print 'pod: lower bound:', cons
-
 
 class SMT_encoding_ip_1 (SMT_base_encoding_ip) :
     def __init__ (self, unfolding) :

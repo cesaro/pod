@@ -80,6 +80,8 @@ where OPTIONS is zero or more of the following options
      That is, if two events are merged, then the postset of one is merged with
      the postset of the other.
      Accepts the same options than 'sp-smt'.
+
+   * ip-smt
 """
 
 try :
@@ -126,7 +128,8 @@ class Main :
         self.arg_eq = "id"
         self.arg_no_asserts = False
         self.arg_smt_timeout = 60
-        self.arg_smt_nr_places = None
+        self.arg_smt_min_places = None
+        self.arg_smt_max_places = None
         self.arg_smt_pre_distinct = False
         #self.arg_smt_merge_post = False
         self.arg_smt_forbid_self = False
@@ -158,6 +161,7 @@ class Main :
                 "sp-pre-max",
                 "sp-smt",
                 "sp-smt-post",
+                "ip-smt",
                 ]
         p = argparse.ArgumentParser (usage = __doc__, add_help=False)
         #p = argparse.ArgumentParser (usage=__doc__)
@@ -172,6 +176,8 @@ class Main :
         p.add_argument ("--eq", choices=eq_choices, default="id")
         p.add_argument ("--smt-timeout", type=int, default=60)
         p.add_argument ("--smt-nr-places", type=int)
+        p.add_argument ("--smt-min-places", type=int)
+        p.add_argument ("--smt-max-places", type=int)
         p.add_argument ("--smt-pre-distinct", action="store_true")
         #p.add_argument ("--smt-merge-post", action="store_true")
         p.add_argument ("--smt-forbid-self", action="store_true")
@@ -195,11 +201,17 @@ class Main :
         self.arg_log_trunc = args.log_truncate
         self.arg_log_negative = args.log_negative
         self.arg_smt_timeout = args.smt_timeout
-        self.arg_smt_nr_places = args.smt_nr_places
         self.arg_smt_pre_distinct = args.smt_pre_distinct
         #self.arg_smt_merge_post = args.smt_merge_post
         self.arg_smt_forbid_self = args.smt_forbid_self
         self.arg_no_asserts = args.no_asserts
+
+        if args.smt_nr_places != None :
+            self.arg_smt_min_places = args.smt_nr_places
+            self.arg_smt_max_places = args.smt_nr_places
+        else :
+            self.arg_smt_min_places = args.smt_min_places
+            self.arg_smt_max_places = args.smt_max_places
 
         if self.arg_command not in ["extract-dependence", "dump-log"] :
             if self.arg_depen_path == None :
@@ -239,7 +251,8 @@ class Main :
                     "arg_smt_pre_distinct",
                     #"arg_smt_merge_post",
                     "arg_smt_forbid_self",
-                    "arg_smt_nr_places",
+                    "arg_smt_min_places",
+                    "arg_smt_max_places",
                     "arg_eq",
                     "arg_output_path",
                     ] :
@@ -303,7 +316,7 @@ class Main :
         print "pod: logs: dumping the positive log:\n"
 
         i = 0
-        print " Idx Len Actions"
+        print " Idx Len Sequence"
         print "---- --- ----------------------------------------"
         for seq in self.log_both :
             print "%4d %3d %s" % (i, len (seq), seq)
@@ -322,7 +335,7 @@ class Main :
         self.pes = log_to_pes (self.log_both, self.indep)
 
         print "pod: logs: dumping the PES in dot format ..."
-        # save the net
+        # save the dot file
         try :
             f = open (self.arg_output_path, "w")
             self.pes.write (f, 'dot')
@@ -480,17 +493,26 @@ class Main :
         elif self.arg_eq == "sp-smt" :
             self.meq = Merging_equivalence_factory.sp_smt (self.bp, \
                     self.arg_smt_timeout * 1000,
-                    self.arg_smt_nr_places,
+                    self.arg_smt_min_places,
+                    self.arg_smt_max_places,
                     self.arg_smt_forbid_self,
                     self.arg_smt_pre_distinct,
                     False)
         elif self.arg_eq == "sp-smt-post" :
             self.meq = Merging_equivalence_factory.sp_smt (self.bp, \
                     self.arg_smt_timeout * 1000,
-                    self.arg_smt_nr_places,
+                    self.arg_smt_min_places,
+                    self.arg_smt_max_places,
                     self.arg_smt_forbid_self,
                     self.arg_smt_pre_distinct,
                     True)
+        elif self.arg_eq == "ip-smt" :
+            self.meq = Merging_equivalence_factory.ip_smt (self.bp, self.indep, \
+                    self.arg_smt_timeout * 1000,
+                    self.arg_smt_min_places,
+                    self.arg_smt_max_places,
+                    self.arg_smt_forbid_self,
+                    self.arg_smt_pre_distinct)
         else :
             raise AssertionError, "Internal inconsistency"
 

@@ -294,8 +294,13 @@ class Depen (SymmetricRelation) :
         # on transitions, ie, t1 t2 dependentn iff their labels so are)
         # is safe, ie, the projection is a valid dependence relation
         for p in net.places :
-            for t1 in p.post | p.pre :
+            for t1 in p.post :
                 for t2 in p.post | p.pre :
+                    a1 = self.domain.lookup (t1.name)
+                    a2 = self.domain.lookup (t2.name)
+                    self.set (a1, a2)
+            for t1 in p.pre :
+                for t2 in p.post :
                     a1 = self.domain.lookup (t1.name)
                     a2 = self.domain.lookup (t2.name)
                     self.set (a1, a2)
