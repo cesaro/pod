@@ -8,9 +8,14 @@ pod [OPTIONS] dump-encoding      LOGFILE DEPENFILE
 pod [OPTIONS] dump-merge         LOGFILE DEPENFILE
 pod [OPTIONS] merge              LOGFILE DEPENFILE
 
-(NOTE: only 'extract-dependence' and 'merge' are so far implemented)
+NOTE: Only the commands:
+ - extract-dependence
+ - dump-log
+ - dump-pes
+ - merge
+are so far implemented. But wait for a while :)
 
-where OPTIONS is zero or more of the following options
+The OPTIONS above is zero or more of the following options:
 
  --help, -h
    Shows this message.
@@ -71,7 +76,9 @@ where OPTIONS is zero or more of the following options
      Ignores negative information.
      If it merges two events, it also merges the preset of one with the preset
      of the other. Accepts many options:
-     --smt-nr-places    : exact number of places on the final net
+     --smt-min-places   : minimum number of places on the final net
+     --smt-max-places   : maximum number of places on the final net
+     --smt-nr-places    : sets the above two options to the same value
      --smt-pre-distinct : require transition presets to be as large as possible
      --smt-forbid-self  : forbids the presence of self loops
 
@@ -79,9 +86,19 @@ where OPTIONS is zero or more of the following options
      Like 'sp-smt' but additionally merging event postsets.
      That is, if two events are merged, then the postset of one is merged with
      the postset of the other.
-     Accepts the same options than 'sp-smt'.
+     Accepts the same options than 'sp-smt', except for --smt-max-places.
 
    * ip-smt
+     Merges all events with same label into 1 single transition.
+     Ignores negative information.
+     If it merges two events, it also merges the preset of one with the preset
+     of the other, and similarly for their postsets.
+     Accepts options:
+     --smt-min-places   : minimum number of places on the final net
+     --smt-pre-distinct : require transition presets to be as large as possible
+     --smt-forbid-self  : forbids the presence of self loops
+
+     Like 'sp-smt-post', it is incompatible with options --smt-{max,nr}-places.
 """
 
 try :
