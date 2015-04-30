@@ -91,8 +91,8 @@ bound(k) ::
   0 <= x_e < x_a
 
 
-TODO
-----
+TODO (old items on the old SMT/SAT encodings)
+---------------------------------------------
  - use (distinct x y) on preset and postset of every event
  - better encoding for the counting on each label, with bit vectors??
  - switch to old encoding for conditions: v_b1,b2, if some number is small ??
@@ -101,47 +101,6 @@ TODO
    generate (distinct x y) for x,y in its preset
  - most events have a label different than anyone else, ie, cannot be merged
    with any one. Remove them from the encoding!!
-
-Commandline syntax
-==================
-
-pod [OPTIONS] extract-dependence	PNML
-pod [OPTIONS] dump-log  			LOGFILE
-pod [OPTIONS] dump-pes  			LOGFILE INDEPFILE
-pod [OPTIONS] dump-bp   			LOGFILE INDEPFILE
-pod [OPTIONS] dump-encoding		LOGFILE INDEPFILE
-pod [OPTIONS] dump-merge			LOGFILE INDEPFILE
-pod [OPTIONS] merge					LOGFILE INDEPFILE
-
-
-
-OPTIONS:
-
---help, -h
---log-first=n					default: -1
---log-only=1,2,4				default: ""
---log-exclude=7,23
---log-negative=PATH
---output=PATH
---eq=EQ
-
-where EQ is
-
-id
-  do not merge anything
-sp-all
-  merges all events with same label
-  merges all conditions into 1 single place
-  ignores negative info
-sp-pre
-  merges all events with same label
-  merges presets of all merged events
-  ignores negative info
-
-#--format={pdf,dot,pnml}
-
-
-- test that the sharing of ActionSets works in cmd_merge
 
 TODO
 ----
@@ -152,4 +111,6 @@ x improving extract-dependence (post \cap post is unnecessary)
 - in the IP encoding, search for cliques of independent transitions and use
   (distinct x y z) for, e.g., the presets of them
 
+- equivalence relation 'only-events'
 - mode to extract logs
+
