@@ -663,9 +663,11 @@ class Net :
                             % (prefx, id (p), prefx, id (t))
             f.write (s)
 
+        # count nr of arrows in the net
+        nra = sum ([len (p.pre) + len (p.post) for p in self.places])
         if full :
-            f.write ('\n\tgraph [label="%d transitions\\n%d places (%d initial)"];\n}\n' %
-                    (len (self.trans), len (self.places), len (self.m0)))
+            f.write ('\n\tgraph [label="%d transitions\\n%d places (%d initial)\\n%d arrows"];\n}\n' %
+                    (len (self.trans), len (self.places), len (self.m0), nra))
 
     def __write_pnml (self, f, m=0) :
         s = '<?xml version="1.0" encoding="UTF-8"?>\n'
