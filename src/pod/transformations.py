@@ -86,7 +86,10 @@ def __pes_to_bp_gen_max_conds (es, unf) :
     print 'pod: pes > bp: generating maximal conditions'
     for e in unf.events :
         if len (e.post) == 0 :
-            c = unf.cond_add (None, [e])
+            m = max ([1] + [len (ep.post) for ep in e.label.inverse_label])
+            print 'pod: pes > bp: max conds: %d for event %s' % (m, repr (e))
+            for i in range (m) :
+                unf.cond_add (None, [e])
 
 def __pes_to_bp_gen_events (es, unf) :
     # translate all events, collect an action set and store it in
