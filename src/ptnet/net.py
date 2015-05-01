@@ -231,6 +231,11 @@ class Marking :
     def is_undef (self, formula) :
         return formula in self.formulas_undef
 
+    def is_safe (self) :
+        for n in self.__marking.values () :
+            if n > 1 : return False
+        return True
+
 class Net :
     def __init__ (self, sanity_check=True) :
         self.places = []
@@ -1008,7 +1013,7 @@ class Net :
         self.__pnmlskipdepth = sys.maxint
         par.ParseFile (f)
         if len (self.__pnmlitm) == 0 :
-            raise Exception, 'missplaced entity'
+            raise Exception, 'missplaced "%s" entity' % tag
         self.__pnmlq.append (self.__pnmlitm)
 
         idx = {}

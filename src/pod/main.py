@@ -334,10 +334,32 @@ class Main :
         else :
             print 'pod: command not yet implemented'
 
+    def load_coe_pairs (self, path) :
+        try :
+            print "pod: cmp-indep: loading coe file '%s'" % path
+            f = open (path, 'r')
+            s = set ()
+            for line in f :
+                [t1,t2] = line.split ()
+                #print "'%s', '%s'" % (t1, t2)
+                s.add ((t1, t2))
+                s.add ((t2, t1))
+            f.close ()
+            print 'pod: cmp-indep: done, %d pairs created' % len (s)
+            return s
+        except Exception as e :
+            raise Exception, "'%s': %s" % (path, e)
+
     def cmd_compare_independence (self) :
         # load the two nets
         net1 = load_net (self.arg_log_path, "pnml", "pod: cmp-indep: ")
         net2 = load_net (self.arg_depen_path, "pnml", "pod: cmp-indep: ")
+
+        if False :
+            path = self.arg_log_path[:-4] + "coe"
+            coe1 = self.load_coe_pairs (path)
+            path = self.arg_depen_path[:-4] + "coe"
+            coe2 = self.load_coe_pairs (path)
 
         # construct independence relations for both
         print "pod: cmp-indep: extracting dependence relations from the nets ..."
@@ -374,6 +396,20 @@ class Main :
         print '---------------------------------'
         print 'pod: cmp-indep: ratios: indep1 in indep2: %.2f' % (float (z) / x)
         print 'pod: cmp-indep: ratios: indep2 in indep1: %.2f' % (float (z) / y)
+
+        if False :
+            print '---------------------------------'
+            indep1_pairs &= coe1
+            indep2_pairs &= coe2
+            inter = indep1_pairs & indep2_pairs
+            x = len (indep1_pairs)
+            y = len (indep2_pairs)
+            z = len (inter)
+            print 'pod: cmp-indep: net1: indep & coe = %3d pairs' % x
+            print 'pod: cmp-indep: net2: indep & coe = %3d pairs' % y
+            print 'pod: cmp-indep: net2: intersection: %3d pairs' % z
+            print 'pod: cmp-indep: new ratios: indep1 in indep2: %.2f' % (float (z) / x)
+            print 'pod: cmp-indep: new ratios: indep2 in indep1: %.2f' % (float (z) / y)
 
     def cmd_extract_dependence (self) :
 
