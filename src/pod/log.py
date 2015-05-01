@@ -232,6 +232,9 @@ class SymmetricRelation :
 
     def get (self, x, y) :
         self.__is_in_domain ([x, y])
+        return self.__get (x, y)
+
+    def __get (self, x, y) :
         if id (x) < id (y) :
             r = (x, y) in self.pairs
         else :
@@ -242,15 +245,16 @@ class SymmetricRelation :
         return self.get (x, y)
 
     def __iter__ (self) :
-        return iter (self.pairs)
+        for x in self.domain :
+            for y in self.domain :
+                if self.__get (x, y) :
+                    yield (x, y)
+
     def __len__ (self) :
-        return len (self.pairs)
+        return len ([x for x in iter (self)])
 
     def __repr__ (self) :
-        return "domain %d pairs %d tab %s negate %s" \
-                % (len (self.domain), len (self.pairs),
-                list (self.pairs),
-                'yes' if self.negate else 'no')
+        return "%d pairs, %d actions" % (len (self), len (self.domain))
     def __str__ (self) :
         return repr (self)
 

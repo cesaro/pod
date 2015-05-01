@@ -1,17 +1,19 @@
 """
 
-pod [OPTIONS] net-stats          PNMLFILE
-pod [OPTIONS] extract-dependence PNMLFILE
-pod [OPTIONS] extract-log        PNMLFILE
-pod [OPTIONS] dump-log           LOGFILE
-pod [OPTIONS] dump-pes           LOGFILE DEPENFILE
-pod [OPTIONS] dump-bp            LOGFILE DEPENFILE
-pod [OPTIONS] dump-encoding      LOGFILE DEPENFILE
-pod [OPTIONS] dump-merge         LOGFILE DEPENFILE
-pod [OPTIONS] merge              LOGFILE DEPENFILE
+pod [OPTIONS] net-stats            PNMLFILE
+pod [OPTIONS] extract-dependence   PNMLFILE
+pod [OPTIONS] compare-independence PNMLFILE PNMLFILE
+pod [OPTIONS] extract-log          PNMLFILE
+pod [OPTIONS] dump-log             LOGFILE
+pod [OPTIONS] dump-pes             LOGFILE DEPENFILE
+pod [OPTIONS] dump-bp              LOGFILE DEPENFILE
+pod [OPTIONS] dump-encoding        LOGFILE DEPENFILE
+pod [OPTIONS] dump-merge           LOGFILE DEPENFILE
+pod [OPTIONS] merge                LOGFILE DEPENFILE
 
 NOTE: Only the commands:
  - extract-dependence
+ - compare-independence
  - extract-log
  - net-stats
  - dump-log
@@ -182,6 +184,7 @@ class Main :
     def parse_cmdline_args (self) :
 
         cmd_choices = [
+                "compare-independence",
                 "extract-dependence",
                 "extract-log",
                 "net-stats",
@@ -316,6 +319,8 @@ class Main :
 
         if self.arg_command == "extract-dependence" :
             self.cmd_extract_dependence ()
+        elif self.arg_command == "compare-independence" :
+            self.cmd_compare_independence ()
         elif self.arg_command == "extract-log" :
             self.cmd_extract_log ()
         elif self.arg_command == "dump-log" :
@@ -328,6 +333,47 @@ class Main :
             self.cmd_merge ()
         else :
             print 'pod: command not yet implemented'
+
+    def cmd_compare_independence (self) :
+        # load the two nets
+        net1 = load_net (self.arg_log_path, "pnml", "pod: cmp-indep: ")
+        net2 = load_net (self.arg_depen_path, "pnml", "pod: cmp-indep: ")
+
+        # construct independence relations for both
+        print "pod: cmp-indep: extracting dependence relations from the nets ..."
+        indep1 = Indep ()
+        indep2 = Indep ()
+        indep1.from_net_names (net1)
+        indep2.from_net_names (net2)
+        print "pod: cmp-indep: done"
+        print '---------------------------------'
+        print "pod: cmp-indep: net1 is '%s'" % self.arg_log_path
+        print "pod: cmp-indep: net2 is '%s'" % self.arg_depen_path
+        names1 = set (indep1.domain.tab.keys ())
+        names2 = set (indep2.domain.tab.keys ())
+        if names1 != names2 :
+            l = list (names1 - names2)
+            if len (l) :
+                print "pod: cmp-indep: WARNING: net1 - net2: %s" % l
+            l = list (names2 - names1)
+            if len (l) :
+                print "pod: cmp-indep: WARNING: net2 - net1: %s" % l
+
+        indep1_pairs = set ((a1.name, a2.name) for a1,a2 in indep1)
+        indep2_pairs = set ((a1.name, a2.name) for a1,a2 in indep2)
+        inter = indep1_pairs & indep2_pairs
+        d1sq = len (indep1.domain) * len (indep1.domain)
+        d2sq = len (indep2.domain) * len (indep2.domain)
+        x = len (indep1_pairs)
+        y = len (indep2_pairs)
+        z = len (inter)
+
+        print 'pod: cmp-indep: net1: dep / indep = %3d / %3d pairs' % (d1sq - x, x)
+        print 'pod: cmp-indep: net2: dep / indep = %3d / %3d pairs' % (d2sq - y, y)
+        print 'pod: cmp-indep: inters. of indep. rels. : %d pairs' % z
+        print '---------------------------------'
+        print 'pod: cmp-indep: ratios: indep1 in indep2: %.2f' % (float (z) / x)
+        print 'pod: cmp-indep: ratios: indep2 in indep1: %.2f' % (float (z) / y)
 
     def cmd_extract_dependence (self) :
 
