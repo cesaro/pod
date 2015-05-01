@@ -581,6 +581,14 @@ class Main :
         print "pod: building the PES from the logs..."
         self.pes = log_to_pes (self.log_both, self.indep)
 
+
+        print "pod: dependedence relation:\n"
+        print "    Action  Dependent with"
+        print "----------  ----------------------------------------------"
+        for a in self.acset :
+            print "%10s  %s" % (a.name, self.indep.dependent_with (a))
+        print
+
         print "pod: logs: dumping the PES in dot format ..."
         # save the dot file
         try :
@@ -590,6 +598,7 @@ class Main :
         except Exception as (e, m) :
             raise Exception, "'%s': %s" % (self.arg_output_path, m)
         print "pod: result PES saved to '%s'" % self.arg_output_path
+
 
     def cmd_merge (self) :
 
@@ -611,8 +620,8 @@ class Main :
 
         # build the BP
         print "pod: building the BP from the PES..."
-        want_max_conds = self.arg_eq == 'sp-smt-post' or self.arg_eq == 'ip-smt'
-        self.bp = pes_to_bp (self.pes, self.indep, want_max_conds)
+        equalize_postsets = self.arg_eq == 'sp-smt-post' or self.arg_eq == 'ip-smt'
+        self.bp = pes_to_bp (self.pes, self.indep, equalize_postsets)
 
         # merge the BP into a net
         self.__merge ()

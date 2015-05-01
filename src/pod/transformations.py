@@ -52,7 +52,7 @@ def __seq_to_pes (es, i, seq, indep) :
         j += 1
 
 
-def pes_to_bp (es, indep, want_max_conds=False) :
+def pes_to_bp (es, indep, equalize_postsets=False) :
     unf = ptnet.Unfolding ()
 
     # generate the events of the unfolding
@@ -73,22 +73,25 @@ def pes_to_bp (es, indep, want_max_conds=False) :
     #pre_tab = __pes_to_bp_gen_conds_pre (es, unf, ev_tab, pre_tab)
 
     # for every maximal event, generate a single condition in the postset
-    if want_max_conds :
-        __pes_to_bp_gen_max_conds (es, unf)
+    if equalize_postsets :
+        __pes_to_bp_equalize_postsets (es, unf)
 
     # we are done!
-    s = "with" if want_max_conds else "without"
-    print "pod: pes > bp: done, %d events, %d conditions, %s maximal conds" % \
+    s = "with" if equalize_postsets else "without"
+    print "pod: pes > bp: done, %d events, %d conditions, %s postset equalization" % \
             (len (unf.events), len (unf.conds), s)
+    #unf.write ('unf.dot', 'dot')
     return unf
 
-def __pes_to_bp_gen_max_conds (es, unf) :
-    print 'pod: pes > bp: generating maximal conditions'
-    for e in unf.events :
-        if len (e.post) == 0 :
-            m = max ([1] + [len (ep.post) for ep in e.label.inverse_label])
-            print 'pod: pes > bp: max conds: %d for event %s' % (m, repr (e))
-            for i in range (m) :
+def __pes_to_bp_equalize_postsets (es, unf) :
+    print 'pod: pes > bp: equalization of event postsets'
+    for a in unf.net.trans :
+        m = max ([1] + [len (e.post) for e in a.inverse_label])
+        for e in a.inverse_label :
+            if len (e.post) == m : continue
+            j = m - len (e.post)
+            print 'pod: pes > bp: equalization: %d new for event %s' % (j, repr (e))
+            for i in range (j) :
                 unf.cond_add (None, [e])
 
 def __pes_to_bp_gen_events (es, unf) :
