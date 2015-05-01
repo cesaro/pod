@@ -114,3 +114,98 @@ x improving extract-dependence (post \cap post is unnecessary)
 - equivalence relation 'only-events'
 - mode to extract logs
 
+
+IP incompatibilities
+--------------------
+
+The current IP encoding is unable to merge conditions for
+mcc/CircadianClock-PT-000001.pnml with the following log:
+
+ Idx Len Sequence
+---- --- ----------------------------------------
+   0  12 [transc_dr, transl_r, transc_da, deg_ma, deg_r, deg_mr, transc_da, deg_ma, transc_dr, transl_r, deg_mr, deg_r]
+   1   9 [transc_da, transl_a, deg_a, deg_ma, transc_dr, transl_r, deg_mr, transc_dr, deg_mr]
+
+The problem is that the last event by deg_mr in the second sequence forces to
+merge the presets of e1 and e9, both events of transl_r, which forces
+dependencies between other transitions that were originally independent.
+
+The underlying problem is the condition generation algorithm we are using :(
+
+Here is the log:
+
+<log openxes.version="1.0RC7" xes.features="" xes.version="1.0" xmlns="http://www.xes-standard.org/">
+<extension name="Concept" prefix="concept" uri="http://www.xes-standard.org/concept.xesext" />
+<string key="concept:name" value="Aha!" />
+<trace>
+	<string key="concept:name" value="seq0" />
+	<event>
+	<string key="concept:name" value="transc_dr" />
+	</event>
+	<event>
+	<string key="concept:name" value="transl_r" />
+	</event>
+	<event>
+	<string key="concept:name" value="transc_da" />
+	</event>
+	<event>
+	<string key="concept:name" value="deg_ma" />
+	</event>
+	<event>
+	<string key="concept:name" value="deg_r" />
+	</event>
+	<event>
+	<string key="concept:name" value="deg_mr" />
+	</event>
+	<event>
+	<string key="concept:name" value="transc_da" />
+	</event>
+	<event>
+	<string key="concept:name" value="deg_ma" />
+	</event>
+	<event>
+	<string key="concept:name" value="transc_dr" />
+	</event>
+	<event>
+	<string key="concept:name" value="transl_r" />
+	</event>
+	<event>
+	<string key="concept:name" value="deg_mr" />
+	</event>
+	<event>
+	<string key="concept:name" value="deg_r" />
+	</event>
+</trace>
+<trace>
+	<string key="concept:name" value="seq1" />
+	<event>
+	<string key="concept:name" value="transc_da" />
+	</event>
+	<event>
+	<string key="concept:name" value="transl_a" />
+	</event>
+	<event>
+	<string key="concept:name" value="deg_a" />
+	</event>
+	<event>
+	<string key="concept:name" value="deg_ma" />
+	</event>
+	<event>
+	<string key="concept:name" value="transc_dr" />
+	</event>
+	<event>
+	<string key="concept:name" value="transl_r" />
+	</event>
+	<event>
+	<string key="concept:name" value="deg_mr" />
+	</event>
+	<event>
+	<string key="concept:name" value="transc_dr" />
+	</event>
+
+	<!-- this is the bad guy -->
+	<event>
+	<string key="concept:name" value="deg_mr" />
+	</event>
+</trace>
+</log>
