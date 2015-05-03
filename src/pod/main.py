@@ -1,4 +1,5 @@
 """
+Usage:
 
 pod [OPTIONS] net-stats            PNMLFILE
 pod [OPTIONS] extract-dependence   PNMLFILE
@@ -6,22 +7,15 @@ pod [OPTIONS] compare-independence PNMLFILE PNMLFILE
 pod [OPTIONS] extract-log          PNMLFILE
 pod [OPTIONS] dump-log             LOGFILE
 pod [OPTIONS] dump-pes             LOGFILE DEPENFILE
+pod [OPTIONS] merge                LOGFILE DEPENFILE
+
+
+NOTE: not yet implemented:
 pod [OPTIONS] dump-bp              LOGFILE DEPENFILE
 pod [OPTIONS] dump-encoding        LOGFILE DEPENFILE
 pod [OPTIONS] dump-merge           LOGFILE DEPENFILE
-pod [OPTIONS] merge                LOGFILE DEPENFILE
 
-NOTE: Only the commands:
- - extract-dependence
- - compare-independence
- - extract-log
- - net-stats
- - dump-log
- - dump-pes
- - merge
-are so far implemented. But wait for a while :)
-
-The OPTIONS above is zero or more of the following options:
+The OPTIONS placeholder corresponds to zero or more of the following options:
 
  --help, -h
    Shows this message.
@@ -150,6 +144,15 @@ if sys.version_info < (2, 7, 0) or sys.version_info >= (3, 0, 0) :
     print ("")
     sys.exit (1)
 
+class MyArgumentParser (argparse.ArgumentParser) :
+    def format_help (self) :
+        return __doc__
+    def parse_args (self) :
+        if len (sys.argv) == 1 :
+            self.print_usage ()
+            self.exit (1)
+        return argparse.ArgumentParser.parse_args (self)
+
 class Main :
     def __init__ (self) :
 
@@ -205,9 +208,9 @@ class Main :
                 "ip-smt",
                 "ev-only",
                 ]
-        p = argparse.ArgumentParser (usage = __doc__, add_help=False)
-        #p = argparse.ArgumentParser (usage=__doc__)
-        p.add_argument ("-h", "--help", action="store_true")
+        usage = "pod [OPTION]... CMD {LOG,PNML} [DEPFILE]\n" + \
+                "Try 'pod --help' for more information."
+        p = MyArgumentParser (prog="pod", usage = usage)
         #g = p.add_mutually_exclusive_group ()
         p.add_argument ("--log-truncate", type=int)
         p.add_argument ("--log-fraction-truncate", type=float)
@@ -233,10 +236,6 @@ class Main :
 
         args = p.parse_args ()
         #print "pod: args:", args
-
-        if args.help :
-            print __doc__
-            sys.exit (0);
 
         self.arg_command = args.cmd
         self.arg_depen_path = args.depen
@@ -267,7 +266,7 @@ class Main :
         if self.arg_command not in \
             ["extract-dependence", "dump-log", "net-stats", "extract-log"] :
             if self.arg_depen_path == None :
-                raise Exception, "Expected path to a dependence file"
+                raise Exception, "Missing argument: expected path to a dependence file"
 
         if args.log_only != None :
             try :

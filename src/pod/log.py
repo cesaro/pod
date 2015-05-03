@@ -134,7 +134,7 @@ class Log :
 
         f.write ('<log openxes.version="1.0RC7" xes.features="" xes.version="1.0" xmlns="http://www.xes-standard.org/">\n')
         f.write ('<extension name="Concept" prefix="concept" uri="http://www.xes-standard.org/concept.xesext" />\n')
-        f.write ('<string key="concept:name" value="Aha!" />\n')
+        f.write ('<string key="concept:name" value="Log generated with pod" />\n')
         i = 0
         for seq in self.traces :
             f.write ('<trace>\n')

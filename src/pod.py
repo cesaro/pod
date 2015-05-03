@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 
 if __name__ == '__main__' :
-    import sys
-    import pod
 
-    m = pod.Main ()
-    m.main ()
-    #pod.test.test19 ()
-    sys.exit (0)
+    #import pod
+    #import sys
+    #m = pod.Main ()
+    #m.main ()
+    #sys.exit (0)
 
     try :
         import sys
         import pod
-        pod.test.test1 ()
+        m = pod.Main ()
+        m.main ()
+        #pod.test.test19 ()
     except KeyboardInterrupt :
         print 'pod: interrupted'
         sys.exit (1)

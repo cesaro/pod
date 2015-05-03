@@ -1,7 +1,20 @@
 
-import os
+def error_missing_package (exception) :
+    print 'ERROR!'
+    print 'It seems that your python installation is missing some package.'
+    print 'This tool requires, among others, the following packages:'
+    print '* resource, networkx, argparse, random, z3, ptnet, pes'
+    print 'The runtime reported the following error:\n\n', str (exception), '\n'
+    print 'You might want to use "easy_install --user PACKAGE"'
+    print ''
+    import sys
+    sys.exit (1)
 
-import ptnet
+try :
+    import os
+    import ptnet
+except ImportError, e:
+    error_missing_package (e)
 
 def output_dict (f, d, prefix='podisc: ') :
     n = max ([len (k) for k in d])
@@ -28,16 +41,6 @@ def load_net (path, fmt="pnml", prefix="pod: ") :
     for t in net.trans[:3] :
         print "%s%s" % (prefix, str (t))
     return net
-
-def error_missing_package (exception) :
-    print 'ERROR!'
-    print 'It seems that your python installation is missing some package.'
-    print 'This tool requires, among others, argparse, and networkx'
-    print 'The runtime reported the following error:\n\n', str (exception), '\n'
-    print 'You might want to use "easy_install --user PACKAGE"'
-    print ''
-    import sys
-    sys.exit (1)
 
 def avg_iter (it) :
     s = 0
