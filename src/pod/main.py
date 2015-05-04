@@ -112,7 +112,7 @@ The OPTIONS placeholder corresponds to zero or more of the following options:
      Merges all events with same label into 1 single transition.
      Merges no condition at all.
      Ignores negative information.
-     Mainly for debuging purposes
+     Mainly for debuging purposes.
 """
 
 try :
