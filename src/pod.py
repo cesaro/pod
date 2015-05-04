@@ -2,11 +2,11 @@
 
 if __name__ == '__main__' :
 
-    import pod
-    import sys
-    m = pod.Main ()
-    m.main ()
-    sys.exit (0)
+    #import pod
+    #import sys
+    #m = pod.Main ()
+    #m.main ()
+    #sys.exit (0)
 
     try :
         import sys

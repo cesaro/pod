@@ -45,14 +45,14 @@ Requirements
 Installation
 ============
 
-The tool is in active development, there is not installation procedure at this
-moment. You need to execute it as ::
+The tool is currently in active development, there is not installation procedure
+at this moment. You need to execute it as ::
 
   ./src/pod.py
 
 Observe that, in addition to the packages listed in the Requirements section,
-Pod also uses the Z3 binding for python, and the packages ``ptnet``, ``pes``,
-``sat``, and all located in the `<src/>`__ folder.
+Pod also uses the Z3 bindings for python and the packages ``ptnet``, ``pes``,
+and ``sat``, all located in the `<src/>`__ folder.
 
 Usage
 ====
@@ -98,7 +98,7 @@ two words, separated by one space, stating the names of two transitions that are
 Author and Contact
 ==================
 
-Developed and maintained by
+Pod is developed and maintained by
 `César Rodríguez <http://lipn.univ-paris13.fr/~rodriguez/>`__.
 Please feel free to contact me in case of questions or to send feedback.
 
