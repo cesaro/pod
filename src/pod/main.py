@@ -7,7 +7,7 @@ pod [OPTIONS] compare-independence PNMLFILE PNMLFILE
 pod [OPTIONS] extract-log          PNMLFILE
 pod [OPTIONS] dump-log             LOGFILE
 pod [OPTIONS] dump-pes             LOGFILE DEPENFILE
-pod [OPTIONS] merge                LOGFILE DEPENFILE
+pod [OPTIONS] discover             LOGFILE DEPENFILE
 
 
 NOTE: not yet implemented:
@@ -196,7 +196,7 @@ class Main :
                 "dump-bp",
                 "dump-encoding",
                 "dump-merge",
-                "merge",
+                "discover",
                 ]
         eq_choices = [
                 "id",
@@ -288,7 +288,7 @@ class Main :
                 "dump-pes"           : "pes.dot",
                 "dump-bp"            : "bp.pdf",
                 "dump-encoding"      : "encoding.smt2",
-                "merge"              : "output.pnml"}
+                "discover"           : "output.pnml"}
             self.arg_output_path = d.get (self.arg_command, "output.txt")
         for opt in [
                     "arg_command",
@@ -328,8 +328,8 @@ class Main :
             self.cmd_dump_pes ()
         elif self.arg_command == "net-stats" :
             self.cmd_net_stats ()
-        elif self.arg_command == "merge" :
-            self.cmd_merge ()
+        elif self.arg_command == "discover" :
+            self.cmd_discover ()
         else :
             print 'pod: command not yet implemented'
 
@@ -599,7 +599,7 @@ class Main :
         print "pod: result PES saved to '%s'" % self.arg_output_path
 
 
-    def cmd_merge (self) :
+    def cmd_discover (self) :
 
         # load the positive and negative logs
         self.__load_all_logs ()
@@ -694,6 +694,8 @@ class Main :
             raise Exception, "'%s': %s" % (path, e)
         nre = sum (len (seq) for seq in log.traces)
         print '%sdone, %s' % (prefix, repr (log))
+        if nre == 0 :
+            print "%sWARNING: empty log!!" % prefix
         return log
 
     def __load_indep (self) :

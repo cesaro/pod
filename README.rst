@@ -1,211 +1,94 @@
-hello world
 
-SAT encoding
-------------
+=============================
+Pod - Partial-Order Discovery
+=============================
 
-See the paper.
+*Pod* is a tool to perform partial-order based
+`process discovery <http://en.wikipedia.org/wiki/Business_process_discovery>`__.
+Process discovery aims at building a formal model
+(in this case, a **Petri net**) that faithfully represents a system from which we
+only know a set of behaviours (in this case, a set of **logs**).
+*Pod*, in addition to the set of logs, also receives as input an independence
+relation on the set of actions happening on the logs.
 
+Note that *Pod* uses Microsoft's Z3 SMT solver, which is not free for commercial
+use. Please see `<src/z3/LICENSE.txt>`__ for further information.
 
-SMT Encoding 1: same as the SAT encoding
-------------
+The tool can perform various tasks, all related with process discovery, and
+works in different modes. Here you have a couple of examples:
 
-- associate every event e and condition b with an integer variable
-  x_e and x_b
+* Displaying the contents of a log file, only the first 10 executions::
 
-equivalence ::
-  nothing to do :)
+   pod dump-log benchmarks/more/a22.xes --log-trunc 10
 
-subset (X, Y) ::
-  AND_{x in X} ( OR_{y in Y} (x_x = x_y ) )
+* Generating the independence relation of a Petri net and writing it to the file
+  ``relation.dep``::
 
-labelling ::
-  for every two events e, e' with different label:
-  x_e != x_e'
+   pod extract-dependence benchmarks/more/a22.pnml --out relation.dep
 
-pre ::
-  for every two events (with equal label!)
-  (x_e == x_e') implies
-  subset (pre e, pre e') and
-  subset (pre e', pre e)
+* Perform process discovery on the same log, using the generated independence,
+  doing very simple heuristics for generalization step (more info with ``-h``)::
 
-post ::
-  as for pre
+   pod discover benchmarks/more/a22.xes relation.dep --eq sp-pre-max --out result.pnml
 
-co ::
-  for every two concurrent conditions b, b'
-  x_b != x_b'
+Requirements
+============
 
-bound(k) ::
-  for all events e,
-  x_e <= k
+* Python 2.7
+* Packages
+  ``resource``,
+  ``random``,
+  ``networkx``,
+  ``argparse``
+  (I guess that last two are the only ones not coming by default).
 
-SMT Encoding 2: using labels
---------------------------
+Installation
+============
 
-- associate every event e with an integer variable x_e
-- associate every condition b with an integer variable x_b
-- associate every label a with an integer variable x_a
+The tool is in active development, there is not installation procedure at this
+moment. You need to execute it as ::
 
-let h : E -> A be the labelling of events with actions
-let h': A -> 2^E be the inverse function
+  ./src/pod.py
 
-subset (X, Y, v) ::
-  v => AND_{x in X} ( OR_{y in Y} (x_x = x_y ) )
+Observe that, in addition to the packages listed in the Requirements section,
+*Pod* also uses the Z3 binding for python, and the packages ``ptnet``, ``pes``,
+``sat``, and all located in the ``src/`` folder.
 
-equivalence ::
-  nothing to do :)
+Usage
+====
 
-labelling ::
-  nothing to do :) !!!
+Run the tool without arguments, or run it with the ``-h`` option to the
+command-line invocation syntax::
 
-pre ::
-  for every two events with equal label:
-  (x_e == x_e') implies
-  subset (pre e, pre e', true) and
-  subset (pre e', pre e, true)
+Formats
+=======
 
-post ::
-  analogous to pre
+*Pod* reads and writes a number of files in various formats:
 
-co ::
-  for every two concurrent conditions b, b'
-  if there exists some label a such that
-    (
-      h' (a) \cap post(b) != empty
-      and
-      h' (a) \cap post(b') != empty)
-    )
-    or
-    (
-      h' (a) \cap pre(b) != empty
-      and
-      h' (a) \cap pre(b') != empty)
-    )
-  then add the constraint:
-  x_b != x_b'
+* Logs: `XES <http://www.xes-standard.org/>`__ format.
+* Petri nets: `PNML <http://www.pnml.org/>`__ format.
 
-bound(k) ::
-  x_{a1} + ... x_{an} <= k
-  and
-  for every label a and every event e in h'(a) :
-  0 <= x_e < x_a
+The dependence relation read by the ``merge`` mode (and written by the
+``extract-dependence`` mode)
+Dependence relation: private format, the relevant reading and writing code is
+located in methods ``cmd_extract_dependence`` and ``__load_indep`` of class
+``Main``, in file ``src/pod/main.py``. Essentially these methods read and
+write a plain text file where lines starting with ``#`` are comments and where
+every line contains two words, separated by one space, stating the names of two
+transitions that are *dependent*. Here is one example::
+
+ # Dependence relation on transition names, automatically extracted from:
+ # benchmarks/atva15/a32.pnml
+ b f
+ f m
+ j j
+ [...]
 
 
-TODO (old items on the old SMT/SAT encodings)
----------------------------------------------
- - use (distinct x y) on preset and postset of every event
- - better encoding for the counting on each label, with bit vectors??
- - switch to old encoding for conditions: v_b1,b2, if some number is small ??
- - generate \bot event when going from the partial orders to the event structure
- - if one event cannot be merged with any other event, you don't need to
-   generate (distinct x y) for x,y in its preset
- - most events have a label different than anyone else, ie, cannot be merged
-   with any one. Remove them from the encoding!!
+Author and Contact
+==================
 
-TODO
-----
+Developed and maintained by
+`César Rodríguez <http://lipn.univ-paris13.fr/~rodriguez/>`__.
+Please feel free to contact me in case of questions or to send feedback.
 
-x improving extract-dependence (post \cap post is unnecessary)
-- accounting for exact nr. of places when merging postsets
-- using 'events-only', devise a (huge!) reduction of SMT encodings
-- in the IP encoding, search for cliques of independent transitions and use
-  (distinct x y z) for, e.g., the presets of them
-
-- equivalence relation 'only-events'
-- mode to extract logs
-
-
-IP incompatibilities
---------------------
-
-The current IP encoding is unable to merge conditions for
-mcc/CircadianClock-PT-000001.pnml with the following log:
-
- Idx Len Sequence
----- --- ----------------------------------------
-   0  12 [transc_dr, transl_r, transc_da, deg_ma, deg_r, deg_mr, transc_da, deg_ma, transc_dr, transl_r, deg_mr, deg_r]
-   1   9 [transc_da, transl_a, deg_a, deg_ma, transc_dr, transl_r, deg_mr, transc_dr, deg_mr]
-
-The problem is that the last event by deg_mr in the second sequence forces to
-merge the presets of e1 and e9, both events of transl_r, which forces
-dependencies between other transitions that were originally independent.
-
-The underlying problem is the condition generation algorithm we are using :(
-
-Here is the log:
-
-<log openxes.version="1.0RC7" xes.features="" xes.version="1.0" xmlns="http://www.xes-standard.org/">
-<extension name="Concept" prefix="concept" uri="http://www.xes-standard.org/concept.xesext" />
-<string key="concept:name" value="Aha!" />
-<trace>
-	<string key="concept:name" value="seq0" />
-	<event>
-	<string key="concept:name" value="transc_dr" />
-	</event>
-	<event>
-	<string key="concept:name" value="transl_r" />
-	</event>
-	<event>
-	<string key="concept:name" value="transc_da" />
-	</event>
-	<event>
-	<string key="concept:name" value="deg_ma" />
-	</event>
-	<event>
-	<string key="concept:name" value="deg_r" />
-	</event>
-	<event>
-	<string key="concept:name" value="deg_mr" />
-	</event>
-	<event>
-	<string key="concept:name" value="transc_da" />
-	</event>
-	<event>
-	<string key="concept:name" value="deg_ma" />
-	</event>
-	<event>
-	<string key="concept:name" value="transc_dr" />
-	</event>
-	<event>
-	<string key="concept:name" value="transl_r" />
-	</event>
-	<event>
-	<string key="concept:name" value="deg_mr" />
-	</event>
-	<event>
-	<string key="concept:name" value="deg_r" />
-	</event>
-</trace>
-<trace>
-	<string key="concept:name" value="seq1" />
-	<event>
-	<string key="concept:name" value="transc_da" />
-	</event>
-	<event>
-	<string key="concept:name" value="transl_a" />
-	</event>
-	<event>
-	<string key="concept:name" value="deg_a" />
-	</event>
-	<event>
-	<string key="concept:name" value="deg_ma" />
-	</event>
-	<event>
-	<string key="concept:name" value="transc_dr" />
-	</event>
-	<event>
-	<string key="concept:name" value="transl_r" />
-	</event>
-	<event>
-	<string key="concept:name" value="deg_mr" />
-	</event>
-	<event>
-	<string key="concept:name" value="transc_dr" />
-	</event>
-
-	<!-- this is the bad guy -->
-	<event>
-	<string key="concept:name" value="deg_mr" />
-	</event>
-</trace>
-</log>

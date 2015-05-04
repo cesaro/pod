@@ -206,7 +206,7 @@ class Log :
         return len (self.traces)
     def __repr__ (self) :
         nre = sum (len (seq) for seq in self.traces)
-        avg = float (nre) / len (self.traces)
+        avg = float (nre) / len (self.traces) if len (self.traces) else 0.0
         return "%d seq, %d log events, %.1f evs/seq, %d distinct actions" % \
             (len (self.traces), nre, avg, len (self.actionset))
     def __str__ (self) :
