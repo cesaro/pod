@@ -92,6 +92,7 @@ let ``h': A -> 2^E`` be the inverse function
 
 TODO (old items on the old SMT/SAT encodings)
 ---------------------------------------------
+
  * use (distinct x y) on preset and postset of every event
  * better encoding for the counting on each label, with bit vectors??
  * switch to old encoding for conditions: v_b1,b2, if some number is small ??
@@ -131,7 +132,9 @@ dependencies between other transitions that were originally independent.
 
 The underlying problem is the condition generation algorithm we are using :(
 
-Here is the log::
+Here is the log:
+
+::
  <log openxes.version="1.0RC7" xes.features="" xes.version="1.0" xmlns="http://www.xes-standard.org/">
  <extension name="Concept" prefix="concept" uri="http://www.xes-standard.org/concept.xesext" />
  <string key="concept:name" value="Aha!" />
