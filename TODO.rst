@@ -48,25 +48,25 @@ SMT Encoding 2: using labels
 let ``h : E -> A`` be the labelling of events with actions
 let ``h': A -> 2^E`` be the inverse function
 
-subset (X, Y, v) ::
+* subset (X, Y, v) ::
   v => AND_{x in X} ( OR_{y in Y} (x_x = x_y ) )
 
-equivalence ::
+* equivalence ::
   nothing to do :)
 
-labelling ::
+* labelling ::
   nothing to do :) !!!
 
-pre ::
+* pre ::
   for every two events with equal label:
   (x_e == x_e') implies
   subset (pre e, pre e', true) and
   subset (pre e', pre e, true)
 
-post ::
+* post ::
   analogous to pre
 
-co ::
+* co ::
   for every two concurrent conditions b, b'
   if there exists some label a such that
     (
@@ -83,7 +83,7 @@ co ::
   then add the constraint:
   x_b != x_b'
 
-bound(k) ::
+* bound(k) ::
   x_{a1} + ... x_{an} <= k
   and
   for every label a and every event e in h'(a) :
@@ -104,24 +104,24 @@ TODO (old items on the old SMT/SAT encodings)
 TODO
 ----
 
-x improving extract-dependence (post \cap post is unnecessary)
-- accounting for exact nr. of places when merging postsets
-- using 'events-only', devise a (huge!) reduction of SMT encodings
-- in the IP encoding, search for cliques of independent transitions and use
-  (distinct x y z) for, e.g., the presets of them
+* x improving extract-dependence (post \cap post is unnecessary)
+*  accounting for exact nr. of places when merging postsets
+*  using 'events-only', devise a (huge!) reduction of SMT encodings
+*  in the IP encoding, search for cliques of independent transitions and use
+   (distinct x y z) for, e.g., the presets of them
 
-- equivalence relation 'only-events'
-- mode to extract logs
+* equivalence relation 'only-events'
+* mode to extract logs
 
 
 IP incompatibilities
 --------------------
 
 The current IP encoding is unable to merge conditions for
-mcc/CircadianClock-PT-000001.pnml with the following log:
+mcc/CircadianClock-PT-000001.pnml with the following log::
 
- Idx Len Sequence
----- --- ----------------------------------------
+ Idx  Len Sequence
+ ---- --- ----------------------------------------
    0  12 [transc_dr, transl_r, transc_da, deg_ma, deg_r, deg_mr, transc_da, deg_ma, transc_dr, transl_r, deg_mr, deg_r]
    1   9 [transc_da, transl_a, deg_a, deg_ma, transc_dr, transl_r, deg_mr, transc_dr, deg_mr]
 
@@ -131,8 +131,7 @@ dependencies between other transitions that were originally independent.
 
 The underlying problem is the condition generation algorithm we are using :(
 
-Here is the log:
-.. code-block:: xml
+Here is the log::
  <log openxes.version="1.0RC7" xes.features="" xes.version="1.0" xmlns="http://www.xes-standard.org/">
  <extension name="Concept" prefix="concept" uri="http://www.xes-standard.org/concept.xesext" />
  <string key="concept:name" value="Aha!" />
