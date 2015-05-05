@@ -45,7 +45,7 @@ Requirements
 Installation
 ============
 
-The tool is currently in active development, there is not installation procedure
+The tool is currently in active development, there is no installation procedure
 at this moment. You need to execute it as ::
 
   ./src/pod.py
