@@ -85,6 +85,14 @@ YACC:=bison
 	@echo "DOT $<"
 	@dot -T pdf < $< > $@
 
+%.svg : %.dot
+	@echo "DOT $<"
+	@dot -T svg < $< > $@
+
+%.png : %.dot
+	@echo "DOT $<"
+	@dot -T png < $< > $@
+
 %.jpg : %.dot
 	@echo "DOT $<"
 	@dot -T jpg < $< > $@
