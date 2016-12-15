@@ -106,12 +106,16 @@ class Log :
 
     def __read_xes (self, f) :
         tree = xml.etree.ElementTree.parse (f)
+        f.seek (0)
+        xmlns = dict (node for _, node in
+                xml.etree.ElementTree.iterparse (f, events=['start-ns']))
+        ns = xmlns[''] if '' in xmlns else ''
         root = tree.getroot()
-        xmltraces = root.findall('{http://www.xes-standard.org/}trace')
+        xmltraces = root.findall('{%s}trace' % ns)
         for trace in xmltraces:
             seq = []
             for xmlev in trace:
-                if xmlev.tag != '{http://www.xes-standard.org/}event' : continue
+                if xmlev.tag != '{%s}event' % ns : continue
                 d = {s.attrib['key'] : s.attrib['value'] for s in xmlev}
                 if 'concept:name' not in d :
                     raise Exception, 'XES file has one event with no "concept:name" key'
